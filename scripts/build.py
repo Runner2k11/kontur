@@ -33,8 +33,8 @@ def build():
         return write(f'assets/{stem}-{sha(data)[:16]}.{extension}', data)
 
     images = {file.stem: asset(file.stem, file.suffix[1:], file.read_bytes())
-              for file in sorted((ROOT / 'art').iterdir()) if file.is_file()}
-    metadata = {key: images[key] for key in ['terrain','atlas','logo','uiAtlas','statusAtlas','airAtlas','planetAtlas','planetTerrainAtlas','campaignBackdrop','startBackdrop']}
+              for file in sorted((ROOT / 'art').iterdir()) if file.is_file() and file.suffix.lower() in ('.png','.ico')}
+    metadata = {key: images[key] for key in ['terrain','atlas','logo','uiAtlas','statusAtlas','airAtlas','planetAtlas','planetTerrainAtlas','campaignBackdrop','startBackdrop','battleBackdrop']}
     metadata['sprites'] = json.loads((ROOT / 'src/sprites.json').read_text(encoding='utf-8'))
     css = (ROOT / 'src/style.css').read_text(encoding='utf-8')
     css += '\n#updateNotice{position:fixed;left:14px;bottom:14px;z-index:45;display:flex;align-items:center;gap:12px;max-width:calc(100vw - 28px);padding:12px 16px;border:1px solid #a4d6e077;border-radius:10px;background:#0d1b27f5;box-shadow:0 6px 30px #0007;color:#deedf1;font:13px system-ui}#updateNotice[hidden]{display:none}#updateNotice button{min-height:36px;padding:7px 12px;background:#d4fa7a;color:#10212b}.pwa-updating #startScreen{pointer-events:none}@media(max-width:500px){#updateNotice{bottom:48px;flex-wrap:wrap;font-size:12px}}\n'

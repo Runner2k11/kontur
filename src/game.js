@@ -276,8 +276,8 @@ function loadArt(){
    const timer=setTimeout(()=>done(null),30000);
    try{image=new Image();image.onload=()=>done(image);image.onerror=()=>done(null);image.src=url;}catch(e){done(null);}
   });
-  const [terrain,atlas,logo,uiAtlas,statusAtlas,airAtlas,planetAtlas,planetTerrainAtlas,campaignBackdrop,startBackdrop]=await Promise.all([load(data.terrain),load(data.atlas),load(data.logo),load(data.uiAtlas),load(data.statusAtlas),load(data.airAtlas),load(data.planetAtlas),load(data.planetTerrainAtlas),load(data.campaignBackdrop),load(data.startBackdrop)]);
-  Object.assign(ART,{terrain,atlas,logo,uiAtlas,statusAtlas,airAtlas,planetAtlas,planetTerrainAtlas,campaignBackdrop,startBackdrop,uiAtlasUrl:data.uiAtlas,ready:!!(terrain&&atlas)});
+  const [terrain,atlas,logo,uiAtlas,statusAtlas,airAtlas,planetAtlas,planetTerrainAtlas,campaignBackdrop,startBackdrop,battleBackdrop]=await Promise.all([load(data.terrain),load(data.atlas),load(data.logo),load(data.uiAtlas),load(data.statusAtlas),load(data.airAtlas),load(data.planetAtlas),load(data.planetTerrainAtlas),load(data.campaignBackdrop),load(data.startBackdrop),load(data.battleBackdrop)]);
+  Object.assign(ART,{terrain,atlas,logo,uiAtlas,statusAtlas,airAtlas,planetAtlas,planetTerrainAtlas,campaignBackdrop,startBackdrop,battleBackdrop,uiAtlasUrl:data.uiAtlas,ready:!!(terrain&&atlas)});
   // CSS rejects very large data URL tokens. Icons only need small atlases.
   const cssAtlas=(image,width)=>{const c=document.createElement('canvas');c.width=Math.min(width,image.width);c.height=Math.round(image.height*c.width/image.width);c.getContext('2d').drawImage(image,0,0,c.width,c.height);return 'url("'+c.toDataURL('image/png')+'")';};
   if(statusAtlas)document.documentElement.style.setProperty('--status-atlas',cssAtlas(statusAtlas,384));
@@ -531,7 +531,10 @@ function applyView(){
 }
 function clearView(){
  ctx.save();ctx.setTransform(1,0,0,1,0,0);ctx.clearRect(0,0,canvas.width,canvas.height);
- if(ART.ready){ctx.drawImage(ART.terrain,0,0,canvas.width,canvas.height);ctx.fillStyle='#0a19275c';ctx.fillRect(0,0,canvas.width,canvas.height);}
+ if(ART.battleBackdrop){
+  const image=ART.battleBackdrop,scale=Math.max(canvas.width/image.width,canvas.height/image.height),w=image.width*scale,h=image.height*scale;
+  ctx.drawImage(image,(canvas.width-w)/2,(canvas.height-h)/2,w,h);
+ }
  else{ctx.fillStyle='#192932';ctx.fillRect(0,0,canvas.width,canvas.height);}
  ctx.restore();applyView();
 }
