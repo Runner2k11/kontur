@@ -4,11 +4,20 @@ from pathlib import Path
 import re
 import struct
 import unittest
+import sys
 
 ROOT = Path(__file__).resolve().parent.parent
 OUT = ROOT / 'dist'
+sys.path.insert(0,str(ROOT/'scripts'))
+from build import version_name
 
 class OfflineBundle(unittest.TestCase):
+    def test_test_build_number_survives_stable_promotion(self):
+        settings={'major':1,'build':30,'testBuild':1}
+        self.assertEqual(version_name(settings),'1.030.01')
+        settings['testBuild']=2
+        self.assertEqual(version_name(settings),'1.030.02')
+        self.assertEqual(version_name({'major':1,'build':29}),'1.029')
     def test_complete_verified_release(self):
         worker = (OUT / 'sw.js').read_text(encoding='utf-8')
         files = json.loads(re.search(r'const FILES=(.*);', worker)[1])

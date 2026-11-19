@@ -1,8 +1,9 @@
 {
   "major": 1,
-  "build": 29,
+  "build": 30,
+  "testBuild": 1,
   "runFormats": {
-    "campaign": 25,
+    "campaign": 30,
     "endless": 19
   }
 }

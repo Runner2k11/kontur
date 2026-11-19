@@ -1,0 +1,7 @@
+{
+  "schema": 2,
+  "stableRef": "467284ace7b149181e74cef7fab2e049d8f6a8c1",
+  "stableVersion": "1.029",
+  "testRef": "test",
+  "promotion": "explicit-command-only"
+}
