@@ -108,7 +108,7 @@ function wavePlan(n){
  return types.map((type,i)=>({type,route:type==='boss'&&n===50?finalBossRoute++%ROUTES.length:(i+n-1)%ROUTES.length,wave:n}));
 }
 function waveInterval(n){return pauseBeforeWave(n);}
-function waveBonus(n){if(state.mode==='campaign')return 20;return 30+n*6;}
+function waveBonus(n){if(state.mode==='campaign')return campaignWaveBonus(n);return 30+n*6;}
 function earlyBonus(){
  if(state.wave===0||campaignAtFinal()||state.waves.length>=MAX_ACTIVE_WAVES||state.mode==='campaign'&&state.difficulty>0)return 0;
  return scheduledBonus();
@@ -513,7 +513,7 @@ const CAMERA={center:{x:WIDTH/2,y:HEIGHT/2},ready:false};
 const CAMERA_INPUT={points:new Map(),gesture:null,blocked:false,until:0};
 
 const UI={context:null,cell:null,anchor:null,modalBasePaused:true};
-const MODALS=['menuDialog','helpDialog','resetDialog','intelDialog','researchDialog','missionDetailsDialog'];
+const MODALS=['menuDialog','helpDialog','resetDialog','intelDialog','researchDialog','missionDetailsDialog','sectorMapDialog'];
 function worldToScreen(x,y){return VIEW.rotated?{x:VIEW.x+(HEIGHT-y)*VIEW.scale,y:VIEW.y+x*VIEW.scale}:{x:VIEW.x+x*VIEW.scale,y:VIEW.y+y*VIEW.scale};}
 function screenToWorld(x,y){
  const wx=VIEW.rotated?(y-VIEW.y)/VIEW.scale:(x-VIEW.x)/VIEW.scale,wy=VIEW.rotated?HEIGHT-(x-VIEW.x)/VIEW.scale:(y-VIEW.y)/VIEW.scale;
@@ -896,7 +896,7 @@ function refreshBattleHUD(){
  $('passiveHud').title='Щит ядра: '+state.passiveShield+' из '+capacity+(state.passiveShield<capacity?' · +1 через '+Math.max(0,Math.ceil(state.shieldRegenAt-state.time))+' с':' · полный заряд');
  const next=nextPreviewWave(),forecast=state.mode==='campaign'&&state.difficulty>0?nextAttackForecast():null,plan=forecast?(state.wave?forecast.items:forecast.items.filter(q=>q.group===forecast.items[0]?.group)):wavePlan(next),types=[...new Set(plan.map(e=>e.type))],bosses=plan.filter(e=>e.type==='boss').length;
  $('intelNext').textContent='ДАЛЕЕ '+String(next).padStart(2,'0');$('intelCount').textContent=plan.length+' врагов'+(plan.some(isAirUnit)?' · ✦ '+plan.filter(isAirUnit).length+' в воздухе':'')+(bosses?' · босс ×'+bosses:'');$('intelBtn').classList.toggle('boss-warning',bosses>0);
- $('intelTypes').innerHTML=types.map(type=>'<span title="'+ENEMIES[type].name+(state.mode==='campaign'?' · '+campaignBounty(type)+' монет, элита ×2':'')+'" style="color:'+ENEMIES[type].color+'">'+unitIcon(type)+'<small>'+plan.filter(e=>e.type===type).length+'</small></span>').join('');
+ $('intelTypes').innerHTML=types.map(type=>'<span title="'+ENEMIES[type].name+(state.mode==='campaign'?' · '+campaignRewardText(type)+' монет, элита ×2':'')+'" style="color:'+ENEMIES[type].color+'">'+unitIcon(type)+'<small>'+plan.filter(e=>e.type===type).length+'</small></span>').join('');
  $('intelBtn').title='Разведка волны '+next+': '+types.map(type=>ENEMIES[type].name+' ×'+plan.filter(e=>e.type===type).length).join(', ')+'. Нажми для подробностей.';
 }
 function closePerkTooltip(){$('perkTooltip').hidden=true;delete $('perkTooltip').dataset.perk;}
@@ -1113,7 +1113,7 @@ function refreshUI(){
  const plan=wavePlan(next),types=[...new Set(plan.map(e=>e.type))],bosses=plan.filter(e=>e.type==='boss').length;
  $('previewLabel').textContent='СЛЕДУЮЩАЯ ВОЛНА / '+String(next).padStart(2,'0')+' · ТРИ НАПРАВЛЕНИЯ';
  $('previewText').textContent=plan.length+' врагов'+(bosses?' · боссов: '+bosses:'')+' · за отражение +'+waveBonus(next);
- $('wavePreview').replaceChildren();for(const type of types){const el=document.createElement('span');el.className='enemy-chip';el.style.color=ENEMIES[type].color;el.title=ENEMIES[type].name+(isAirUnit(type)?' · Воздух: Импульс, Крио, Рельса':' · Наземная цель');el.setAttribute('aria-label',ENEMIES[type].name);el.innerHTML=unitIcon(type)+'<strong>'+ENEMIES[type].name+(isAirUnit(type)?' · ВОЗДУХ':'')+'</strong><small>×'+plan.filter(e=>e.type===type).length+(state.mode==='campaign'?' · '+campaignBounty(type)+' мон./шт.':'')+'</small>';$('wavePreview').append(el);}
+ $('wavePreview').replaceChildren();for(const type of types){const el=document.createElement('span');el.className='enemy-chip';el.style.color=ENEMIES[type].color;el.title=ENEMIES[type].name+(isAirUnit(type)?' · Воздух: Импульс, Крио, Рельса':' · Наземная цель');el.setAttribute('aria-label',ENEMIES[type].name);el.innerHTML=unitIcon(type)+'<strong>'+ENEMIES[type].name+(isAirUnit(type)?' · ВОЗДУХ':'')+'</strong><small>×'+plan.filter(e=>e.type===type).length+(state.mode==='campaign'?' · '+campaignRewardText(type)+' мон./шт.':'')+'</small>';$('wavePreview').append(el);}
  $('tipTitle').textContent=bosses?'ВНИМАНИЕ: ТЯЖЁЛЫЙ КОНТАКТ':'МОНЕТЫ ЗА РИСК';$('tipText').textContent=bosses?'Босс идёт по одному из трёх маршрутов. Усиль Рельсой общий участок у ядра; Крио даст больше времени на огонь.':'Бонус снижается по времени до автозапуска и не восстанавливается после зачистки. Таймер начинается после выхода последнего юнита предыдущей волны. Одновременно — до двух волн.';
  $('saveStatus').textContent=storageAvailable?'· автосохранение':'· сохранение недоступно';
  const ended=state.phase==='lose';$('boardOverlay').dataset.ended=String(ended);$('pauseShortcut').hidden=ended;$('boardOverlay').hidden=!sessionStarted||anyDialogOpen()||(!paused&&!ended);
@@ -1657,7 +1657,7 @@ const DIFFICULTIES=[
  {name:'Кошмар',cap:3,count:1.65,desc:'Один усиленный штурм с особым условием сектора.'}
 ];
 let appScreen='home',selectedSector=0,selectedDifficulty=0;
-function sectorInfo(id){const biome=Math.min(3,Math.floor(id/7)),routes=CAMPAIGN_ROAD_COUNTS[id];return{id,name:SECTOR_NAMES[id],biome,routes,waves:6+Math.floor(id/6),budget:campaignOpeningBudget(id)};}
+function sectorInfo(id){const biome=Math.min(3,Math.floor(id/7)),routes=CAMPAIGN_ROAD_COUNTS[id];return{id,name:SECTOR_NAMES[id],biome,routes,waves:10+Math.floor(id*10/28),budget:campaignOpeningBudget(id)};}
 
 function installRoutes(raw){
  validateRoadClearance(raw);
@@ -1731,7 +1731,7 @@ function validateRun(s){
  const finite=(n,min=0,max=Number.MAX_SAFE_INTEGER)=>Number.isFinite(n)&&n>=min&&n<=max;
  const integer=(n,min=0,max=Number.MAX_SAFE_INTEGER)=>Number.isSafeInteger(n)&&n>=min&&n<=max;
  if(!s||!['campaign','endless'].includes(s.mode)||!['build','wave','win','lose'].includes(s.phase))return false;
- if(s.mode==='campaign'&&(!integer(s.sectorId,0,28)||!integer(s.difficulty,0,2)||s.goalWaves!==missionInfo(s.sectorId,s.difficulty).waves))return false;
+ if(s.mode==='campaign'&&(!integer(s.sectorId,0,28)||!integer(s.difficulty,0,2)||s.encounterVersion!==undefined&&![30,31].includes(s.encounterVersion)||s.goalWaves!==(s.difficulty>0?1:s.encounterVersion>=31?sectorInfo(s.sectorId).waves:legacyCampaignWaves(s.sectorId))))return false;
  if(!integer(s.wave,0,s.mode==='campaign'?s.goalWaves:100000)||!integer(s.completed,0,s.wave)||!integer(s.lives,0,20)||!integer(s.money)||!integer(s.nextId,1)||!finite(s.time)||!finite(s.score)||!integer(s.kills)||!finite(s.nextWaveIn,0,60)||!finite(s.launchCooldown,0,2)||!finite(s.spawnTimer,-1,600))return false;
  for(const key of ['towers','enemies','queue','waves','shots','orbitalStrikes'])if(!Array.isArray(s[key]))return false;
  if(s.mode==='campaign'&&(s.rulesVersion!==30||s.maxLives!==missionInfo(s.sectorId,s.difficulty).maxCore||s.lives>s.maxLives||!s.arsenal||Object.keys(TOWERS).some(t=>typeof s.arsenal.types?.[t]!=='boolean'||!integer(s.arsenal.caps?.[t],0,3))))return false;
@@ -1773,7 +1773,7 @@ function deploySector(){
 function startBattle(mode,sectorId=0,difficulty=0){
  closeAllDialogs();closeContextPanel();endCameraGesture();abilityAim=null;state=freshState();state.mode=mode;
  state.research={...appData.profile.research};state.techPoints=0;state.techEarned=techSpentPoints(state.research);state.passiveShield=passiveShieldCapacity();
- if(mode==='campaign'){state.sectorId=sectorId;state.difficulty=difficulty;state.arsenal=captureArsenal();state.goalWaves=missionInfo(sectorId,difficulty).waves;state.maxLives=missionInfo(sectorId,difficulty).maxCore;state.lives=state.maxLives;state.rulesVersion=30;state.encounterVersion=30;state.nextWaveIn=0;state.finalBossKilled=false;state.money=missionInfo(sectorId,difficulty).budget;installRoutes(sectorRoutes(sectorId));}
+ if(mode==='campaign'){state.sectorId=sectorId;state.difficulty=difficulty;state.arsenal=captureArsenal();state.goalWaves=missionInfo(sectorId,difficulty).waves;state.maxLives=missionInfo(sectorId,difficulty).maxCore;state.lives=state.maxLives;state.rulesVersion=30;state.encounterVersion=31;state.nextWaveIn=0;state.finalBossKilled=false;state.money=missionInfo(sectorId,difficulty).budget;installRoutes(sectorRoutes(sectorId));}
  else{state.mapVersion=19;installRoutes(ENDLESS_ROUTES);}
  particles=[];beams=[];floaters=[];resetVisuals();progressSaveNeeded=false;speed=1;lastSave=0;centerMap();startSession();makeLandscape();saveProgress();
 }
@@ -1804,7 +1804,20 @@ function refreshCommandStats(){
  $('commandTechBtn').classList.toggle('has-points',canSpend);$('commandTechBtn').title=canSpend?'Есть очки для изучения технологий':'Технологии командира';$('commandTechBtn').setAttribute('aria-label','Технологии: '+points+' свободных очков'+(canSpend?', доступно улучшение':''));
  $('campaignSummary').textContent=normals===SECTOR_COUNT?(earned===87?'Все сектора защищены на трёх сложностях.':'Все планеты защищены. Пройди остальные сложности.'):'';
 }
-function sectorMiniMap(id){return '<canvas id="sectorPreviewCanvas" class="sector-minimap" width="768" height="384" role="img" aria-label="Ландшафт сектора, дороги, ядро и строительные площадки"></canvas>';}
+function sectorMiniMap(id){return '<canvas id="sectorPreviewCanvas" class="sector-minimap" width="768" height="384" role="img" aria-label="Ландшафт сектора, дороги, ядро и строительные площадки"></canvas><span class="sector-preview-open" aria-hidden="true">＋ Увеличить</span>';}
+function drawLargeSectorMap(){
+ const id=selectedSector,m=missionInfo(id,selectedDifficulty),c=$('sectorLargeCanvas');
+ const rotated=window.innerHeight>window.innerWidth&&window.innerWidth<700;
+ const width=rotated?HEIGHT:WIDTH,height=rotated?WIDTH:HEIGHT;
+ const scale=Math.min((window.innerWidth-72)/width,(window.innerHeight-180)/height,1.15),ratio=Math.min(window.devicePixelRatio||1,2);
+ const w=Math.max(100,width*scale),h=Math.max(100,height*scale);
+ c.style.width=w+'px';c.style.height=h+'px';c.width=Math.round(w*ratio);c.height=Math.round(h*ratio);
+ c.dataset.rotated=String(rotated);c.dataset.sector=String(id);
+ $('sectorMapTitle').textContent='Сектор '+String(id+1).padStart(2,'0')+' · '+m.name;
+ $('sectorMapSubtitle').textContent=BIOMES[m.biome].name+' · '+(m.assault?'Один штурм':m.waves+' волн')+' · '+sectorPads(id).length+' площадок';
+ drawSectorPreview(id,'sectorLargeCanvas',rotated);
+}
+function openSectorMap(){if(appScreen!=='campaign'||sessionStarted)return;showDialog('sectorMapDialog');drawLargeSectorMap();}
 function renderSectorMap(){
  $('sectorMap').innerHTML=BIOMES.map((b,act)=>'<section class="planet-row" style="--sector-color:'+b.color+'"><header class="planet-info">'+planetIcon(act)+'<div><small>ПЛАНЕТА 0'+(act+1)+'</small><h2>'+b.name+'</h2><span>'+b.kind+'</span></div></header><div class="planet-sectors" aria-label="Сектора планеты '+b.name+'"><div class="sector-chain">'+Array.from({length:act===3?8:7},(_,i)=>{
   const id=act*7+i,mask=appData.profile.cleared[id],locked=!sectorUnlocked(id);
@@ -1814,6 +1827,11 @@ function renderSectorMap(){
 
 function refreshResumeButton(){const mode=resumable(appData.lastMode)?appData.lastMode:resumable('campaign')?'campaign':resumable('endless')?'endless':null;$('resumeRunBtn').hidden=!mode;$('resumeRunBtn').dataset.mode=mode||'';$('endlessModeBtn').textContent=resumable('endless')?'Бесконечная · продолжить':'Бесконечная оборона';}
 function initCampaignUI(){
+ $('sectorPreview').addEventListener('click',openSectorMap);
+ $('closeSectorMap').addEventListener('click',()=>closeDialog('sectorMapDialog'));
+ $('sectorMapDialog').addEventListener('cancel',event=>{event.preventDefault();closeDialog('sectorMapDialog');});
+ $('sectorMapDialog').addEventListener('click',event=>{if(event.target!==$('sectorMapDialog'))return;const r=event.target.getBoundingClientRect();if(event.clientX<r.left||event.clientX>r.right||event.clientY<r.top||event.clientY>r.bottom)closeDialog('sectorMapDialog');});
+ window.addEventListener('resize',()=>{if($('sectorMapDialog').open)drawLargeSectorMap();});
  $('sectorMap').addEventListener('click',e=>{const b=e.target.closest('[data-sector]');if(!b||b.disabled)return;selectedSector=Number(b.dataset.sector);selectedDifficulty=0;renderSectorMap();renderSectorDetails();});
  $('difficultyOptions').addEventListener('click',e=>{const b=e.target.closest('[data-difficulty]');if(!b||b.disabled||!difficultyUnlocked(selectedSector,Number(b.dataset.difficulty)))return;selectedDifficulty=Number(b.dataset.difficulty);renderSectorDetails();});
  $('missionDetailsBtn').addEventListener('click',()=>showDialog('missionDetailsDialog'));$('closeMissionDetails').addEventListener('click',()=>closeDialog('missionDetailsDialog'));$('missionDetailsDialog').addEventListener('cancel',e=>{e.preventDefault();closeDialog('missionDetailsDialog');});$('deployBtn').addEventListener('click',deploySector);$('commandTechBtn').addEventListener('click',()=>openTechTree());$('commandHomeBtn').addEventListener('click',returnHome);
@@ -1822,7 +1840,7 @@ function initCampaignUI(){
  $('exportProfileBtn').addEventListener('click',()=>{const blob=new Blob([JSON.stringify({version:12,profile:appData.profile},null,2)],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='kontur_commander.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),5000);});
  $('importProfileBtn').addEventListener('click',()=>$('importProfileFile').click());
  $('importProfileFile').addEventListener('change',async e=>{const f=e.target.files[0];if(!f)return;try{if(f.size>50000)throw Error();const a=JSON.parse(await f.text());if(a.version!==12||!validateProfile(a.profile)||resumable('campaign'))throw Error();appData.profile=normaliseStars(a.profile);persistApp();state.research={...a.profile.research};state.techPoints=profilePoints();renderSectorMap();renderSectorDetails();refreshCommandStats();refreshUI();notify('Профиль командира восстановлен');}catch(err){notify('Не удалось загрузить профиль: нужен корректный файл КОНТУР v12 без активного боя кампании.',true);}e.target.value='';});
- refreshResumeButton();assetsReady.then(()=>{if(ART.logo)$('commandLogo').src=ART.logo.src;if(appScreen==='campaign'){renderSectorMap();drawSectorPreview(selectedSector);}});
+ refreshResumeButton();assetsReady.then(()=>{if(ART.logo)$('commandLogo').src=ART.logo.src;if(appScreen==='campaign'){renderSectorMap();drawSectorPreview(selectedSector);if($('sectorMapDialog').open)drawLargeSectorMap();}});
 }
 
 const PAD_CACHE=new Map();
@@ -1831,7 +1849,7 @@ function pointOnRoute(r,d){const s=r.segments.find(s=>d<=s.start+s.length)||r.se
 function roadCells(routes){const set=new Set();for(const r of routes)for(const s of r.segments)for(let d=0;d<=s.length;d+=CELL){const c=Math.floor((s.a.x+(s.b.x-s.a.x)*d/s.length)/CELL),y=Math.floor((s.a.y+(s.b.y-s.a.y)*d/s.length)/CELL);if(c>=0&&c<COLS&&y>=0&&y<ROWS)set.add(c+','+y);}return set;}
 
 function buildPadAt(c,r){return state.mode==='campaign'?sectorPads(state.sectorId).find(p=>p.c===c&&p.r===r):null;}
-// Stable kill rewards: stronger units pay more, regardless of wave size.
+// Nominal type rewards; extended standards share the original mission budget.
 const CAMPAIGN_BOUNTIES={swarm:2,scout:8,runner:8,armor:18,drone:4,gunship:18,guardian:20,medic:16,boss:80};
 function campaignBounty(type,elite=false){return CAMPAIGN_BOUNTIES[type]*(elite?2:1);}
 function enemyReward(e){return state.mode==='campaign'?(e.bounty??campaignBounty(e.type,e.elite)):ENEMIES[e.type].reward;}
@@ -1847,9 +1865,9 @@ function paintSector(g,routes,pads,biome){
  for(const route of routes){const trace=()=>{g.beginPath();g.moveTo(route.points[0].x,route.points[0].y);for(const p of route.points.slice(1))g.lineTo(p.x,p.y);};g.lineJoin='round';g.lineCap='round';for(const[w,color]of[[48,'#12212c88'],[43,biome===1?'#879da7':'#6b736c'],[36,'#29363c'],[30,'#414d50']]){g.lineWidth=w;g.strokeStyle=color;trace();g.stroke();}g.lineWidth=1;g.setLineDash([9,13]);g.strokeStyle='#ddc99577';trace();g.stroke();g.setLineDash([]);drawEntryPort(g,route);}
 }
 function makeLandscape(){if(state.mode!=='campaign'){legacyLandscape();return;}paintSector(landscape.getContext('2d'),ROUTES,sectorPads(state.sectorId),sectorInfo(state.sectorId).biome);}
-function drawSectorPreview(id){
- const c=$('sectorPreviewCanvas');if(!c)return;const g=c.getContext('2d');if(!g)return;const r=padGeometry(sectorRoutes(id)),pads=sectorPads(id);
- g.save();g.setTransform(c.width/WIDTH,0,0,c.height/HEIGHT,0,0);paintSector(g,r,pads,sectorInfo(id).biome);drawAirCorridors(g,makeAirRoutes(r),true);for(const p of pads)drawBuildPad(g,p,false,true);
+function drawSectorPreview(id,target='sectorPreviewCanvas',rotated=false){
+ const c=$(target);if(!c)return;const g=c.getContext('2d');if(!g)return;const r=padGeometry(sectorRoutes(id)),pads=sectorPads(id);
+ g.save();if(rotated)g.setTransform(0,c.height/WIDTH,-c.width/HEIGHT,0,c.width,0);else g.setTransform(c.width/WIDTH,0,0,c.height/HEIGHT,0,0);paintSector(g,r,pads,sectorInfo(id).biome);drawAirCorridors(g,makeAirRoutes(r),true);for(const p of pads)drawBuildPad(g,p,false,true);
  const core=r[0].points.at(-1);g.fillStyle='#99f5d822';g.beginPath();g.arc(core.x-8,core.y,44,0,Math.PI*2);g.fill();if(ART.ready)sprite(g,'core',core.x-8,core.y,62);else{g.fillStyle='#a8ffce';g.fillRect(core.x-16,core.y-18,28,36);}g.restore();
 }
 
@@ -2082,14 +2100,15 @@ function activeThreatRatio(){
  return total?clamp((alive+queued)/total,0,1):0;
 }
 function earlyRewardCap(n){
- const key=[state.mode,state.sectorId,state.difficulty,n].join('/');if(EARLY_REWARD_CACHE.has(key))return EARLY_REWARD_CACHE.get(key);
+ const key=[state.mode,state.sectorId,state.difficulty,state.encounterVersion,state.goalWaves,n].join('/');if(EARLY_REWARD_CACHE.has(key))return EARLY_REWARD_CACHE.get(key);
+ if(extendedStandard()){const cap=standardEconomy().earlyCaps[n]||0;EARLY_REWARD_CACHE.set(key,cap);return cap;}
  let budget=0;
  const first=state.mode==='campaign'?1:n;
  for(let wave=first;wave<=n;wave++){const value=wavePlan(wave).reduce((v,e)=>v+(state.mode==='campaign'?campaignBounty(e.type,e.elite):ENEMIES[e.type].reward),0);budget=Math.max(budget,value);}
  const cap=20+n*2+Math.round(budget*.18);EARLY_REWARD_CACHE.set(key,cap);return cap;
 }
 function earlyRewardCapForMission(id,difficulty,n){
- const previous=state;state={...state,mode:'campaign',sectorId:id,difficulty,goalWaves:sectorInfo(id).waves};try{return earlyRewardCap(n);}finally{state=previous;}
+ const previous=state;state={...state,mode:'campaign',sectorId:id,difficulty,encounterVersion:31,goalWaves:difficulty?1:sectorInfo(id).waves};try{return earlyRewardCap(n);}finally{state=previous;}
 }
 function planetIcon(index){
  if(ART.planetAtlas&&!PLANET_PORTRAITS.has(index)){const c=document.createElement('canvas');c.width=c.height=144;const image=ART.planetAtlas,w=image.width/2,h=image.height/2;c.getContext('2d').drawImage(image,(index%2)*w,Math.floor(index/2)*h,w,h,0,0,144,144);PLANET_PORTRAITS.set(index,c.toDataURL('image/png'));}

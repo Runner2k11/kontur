@@ -2,6 +2,7 @@ const {test}=require('node:test');
 const assert=require('node:assert/strict');
 const fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
 const code=fs.readFileSync(path.join(__dirname,'../src/battle.js'),'utf8');
+const sectorInfoCode=fs.readFileSync(path.join(__dirname,'../src/game.js'),'utf8').match(/function sectorInfo\(id\)\{[^\n]+\}/)[0];
 function combat(){
  let entropy=100;
  const c={CELL:48,WIDTH:1152,HEIGHT:576,crypto:{getRandomValues:bytes=>{bytes[0]=++entropy;return bytes;}},
@@ -70,4 +71,31 @@ test('Old bag saves and new independent RNG saves remain valid',()=>{
  assert.equal(run("boss.commander.bag=['armor','landing'];validateCombatState(state)"),true);
  assert.equal(run("boss.commander.bag=['armor','armor'];validateCombatState(state)"),false);
  assert.equal(run("delete boss.commander.bag;boss.commander.seed=1.5;validateCombatState(state)"),false);
+});
+test('Standard sectors increase monotonically from ten to twenty waves',()=>{
+ const run=combat();
+ run("globalThis.CAMPAIGN_ROAD_COUNTS=Array(29).fill(1);globalThis.SECTOR_NAMES=Array(29).fill('Sector');"+sectorInfoCode);
+ const counts=plain(run("Array.from({length:29},(_,id)=>sectorInfo(id).waves)"));
+ assert.equal(counts[0],10);assert.equal(counts.at(-1),20);
+ assert.ok(counts.every((n,i)=>Number.isInteger(n)&&n>=10&&n<=20&&(!i||n>=counts[i-1])));
+});
+test('Long standards retain every original main attack and end with the final one',()=>{
+ const run=combat();
+ for(let id=0;id<29;id++){
+  const count=10+Math.floor(id*10/28);
+  const slots=plain(run(`Array.from({length:${count}},(_,i)=>standardWaveSlot(${id},i+1,${count}))`));
+  const main=slots.filter(slot=>!slot.interlude),original=6+Math.floor(id/6);
+  assert.equal(main.length,original);assert.deepEqual(main.map(slot=>slot.recipeWave),Array.from({length:original},(_,i)=>i+1));
+  assert.equal(slots[0].interlude,false);assert.equal(slots.at(-1).interlude,false);assert.equal(slots.at(-1).progress,1);
+ }
+});
+test('Existing standards and both assault difficulties keep their old schedule mode',()=>{
+ const run=combat();
+ assert.equal(run("extendedStandard({mode:'campaign',difficulty:0,encounterVersion:31})"),true);
+ for(const difficulty of [1,2])assert.equal(run(`extendedStandard({mode:'campaign',difficulty:${difficulty},encounterVersion:31})`),false);
+ assert.equal(run("extendedStandard({mode:'campaign',difficulty:0,encounterVersion:30})"),false);
+ for(let id=0;id<29;id++){
+  const count=6+Math.floor(id/6);
+  assert.equal(run(`Array.from({length:${count}},(_,i)=>standardWaveSlot(${id},i+1,${count})).every((slot,i)=>!slot.interlude&&slot.recipeWave===i+1)`),true);
+ }
 });

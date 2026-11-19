@@ -5,6 +5,45 @@ const COMMANDER_SKILLS = ['landing', 'armor', 'repair', 'sabotage'];
 const COMMANDER_NAMES = {landing:'ВЫСАДКА', armor:'БРОНЕКУПОЛ', repair:'РЕМОНТНЫЙ ИМПУЛЬС', sabotage:'ДИВЕРСИОННЫЙ ВЫСТРЕЛ'};
 let repairHold = null;
 const repairPointers = new Set();
+const CAMPAIGN_ECONOMY = new Map();
+
+function legacyCampaignWaves(id){return 6+Math.floor(id/6);}
+function extendedStandard(run=state){return run.mode==='campaign'&&run.difficulty===0&&run.encounterVersion>=31;}
+function standardWaveSlot(id,wave,count){
+ const original=legacyCampaignWaves(id);
+ if(count<=original)return {progress:(wave-1)/Math.max(1,count-1),recipeWave:wave,interlude:false};
+ const main=Array.from({length:original},(_,i)=>1+Math.round(i*(count-1)/(original-1)));
+ const exact=main.indexOf(wave),index=exact>=0?exact:Math.max(0,main.findIndex(n=>n>wave)-1);
+ return {progress:index/(original-1),recipeWave:exact>=0?index+1:wave*17+index+1,interlude:exact<0};
+}
+function standardEconomy(){
+ const id=state.sectorId,count=state.goalWaves||missionInfo(id,0).waves,key=id+'/'+count;
+ if(CAMPAIGN_ECONOMY.has(key))return CAMPAIGN_ECONOMY.get(key);
+ const oldCount=legacyCampaignWaves(id),oldPlans=Array.from({length:oldCount},(_,i)=>rawCampaignAttack(i+1,oldCount));
+ const plans=Array.from({length:count},(_,i)=>rawCampaignAttack(i+1,count));
+ const nominal=plan=>plan.reduce((sum,e)=>sum+campaignBounty(e.type,e.elite),0);
+ const nonBoss=plan=>plan.reduce((sum,e)=>sum+(e.type==='boss'?0:campaignBounty(e.type,e.elite)),0);
+ const oldKills=oldPlans.reduce((sum,plan)=>sum+nonBoss(plan),0),newKills=plans.reduce((sum,plan)=>sum+nonBoss(plan),0);
+ const prefix=[0];for(const plan of plans)prefix.push(prefix.at(-1)+nonBoss(plan));
+ let max=0;const oldCaps=oldPlans.map((plan,i)=>{max=Math.max(max,nominal(plan));return 20+2*(i+1)+Math.round(max*.18);});
+ max=0;const newCaps=plans.map((plan,i)=>{max=Math.max(max,nominal(plan));return 20+2*(1+i*(oldCount-1)/(count-1))+Math.round(max*.18);});
+ const earlyBudget=oldCaps.slice(1).reduce((sum,n)=>sum+n,0),earlyRaw=newCaps.slice(1).reduce((sum,n)=>sum+n,0);
+ const earlyCaps=[0,0,...newCaps.slice(1).map(cap=>Math.floor(cap*earlyBudget/earlyRaw+1e-8))];
+ const remainder=earlyBudget-earlyCaps.reduce((sum,n)=>sum+n,0);
+ for(let i=0;i<remainder;i++)earlyCaps[count-i]++;
+ const result={oldCount,count,killScale:oldKills/newKills,prefix,earlyCaps,killBudget:oldKills,clearBudget:20*oldCount,earlyBudget};
+ CAMPAIGN_ECONOMY.set(key,result);return result;
+}
+function campaignWaveBonus(wave){
+ if(!extendedStandard())return 20;
+ const e=standardEconomy();return Math.floor(wave*e.clearBudget/e.count+1e-8)-Math.floor((wave-1)*e.clearBudget/e.count+1e-8);
+}
+function campaignRewardText(type,elite=false){
+ const nominal=campaignBounty(type,elite);
+ if(!extendedStandard()||type==='boss')return String(nominal);
+ const value=nominal*standardEconomy().killScale,low=Math.floor(value+1e-8),high=Math.ceil(value-1e-8);
+ return low===high?String(low):low+'–'+high;
+}
 
 function campaignOpeningBudget(id, difficulty=0) {
  return 100 + Math.min(40, Math.floor(id / 2) * 5) + difficulty * 25;
@@ -23,33 +62,34 @@ function plannedUnitSpeed(item) {
  if(item.type==='boss')return m.bossKind<0?ENEMIES.boss.speed:BOSS_KINDS[m.bossKind].speed;
  return (item.groupSpeed || ENEMIES[item.type].speed*(item.elite?1.05:1)) * (m.modifier==='Быстрый фланг'&&item.type==='runner'?1.15:1);
 }
-function planCampaignAttack(wave) {
+function rawCampaignAttack(wave,waveCount=state.goalWaves||missionInfo(state.sectorId,state.difficulty).waves) {
  const m=missionInfo(state.sectorId,state.difficulty), out=[], entries=battleEntryGroups();
  const stage=m.id+(m.difficulty===1?2:m.difficulty===2?5:0);
  let group=0, offset=0;
  for(let local=0;local<(m.assault?4:1);local++) {
-  const progress=m.assault?local/3:(wave-1)/Math.max(1,m.waves-1);
+  const slot=m.assault?null:standardWaveSlot(m.id,wave,waveCount),progress=m.assault?local/3:slot.progress;
+  const recipeWave=m.assault?wave:slot.recipeWave,interlude=!!slot?.interlude;
   const phase=m.assault?local+1:Math.min(4,1+Math.floor(progress*3.99));
-  const groups=m.assault?[9,8,9,10][local]+Math.floor(m.id/12):2+Math.floor(progress*3)+Math.floor(m.id/14)+(m.id>=5?1:0);
+  const groups=m.assault?[9,8,9,10][local]+Math.floor(m.id/12):interlude?1:2+Math.floor(progress*3)+Math.floor(m.id/14)+(m.id>=5?1:0);
   const size=(m.assault?3+local:3+Math.floor(progress*4))+Math.floor(m.id/14);
   const used={}, limits={scout:Math.floor(progress*(3+m.id*.5)), runner:Math.floor(progress*(1+stage*.35)), armor:stage>=3?Math.floor(progress*(1+stage*.18)):0, gunship:stage>=7&&progress>=.6?1+Math.floor(stage/14):0, guardian:stage>=8&&progress>=.45?1+Math.floor(stage/14):0, medic:stage>=11&&progress>=.55?1+Math.floor(stage/19):0};
   const pool=['swarm','swarm','swarm','swarm'];
   if(progress>=.25)pool.push('scout');
   if(stage>=1&&progress>=.5)pool.push('runner');
-  if(stage>=3&&progress>=.45)pool.push('armor');
+  if(!interlude&&stage>=3&&progress>=.45)pool.push('armor');
   if(stage>=4&&progress>=.35)pool.push('drone','drone');
-  if(stage>=7&&progress>=.6)pool.push('gunship');
+  if(!interlude&&stage>=7&&progress>=.6)pool.push('gunship');
   const themeType={rush:'runner',armor:'armor',air:'drone',bastion:'armor',carrier:'drone'}[m.theme];
   if(themeType&&pool.includes(themeType))pool.push(themeType,themeType);
   for(let cohort=0;cohort<groups;cohort++) {
    group++;
    const fronts=progress<.4?1:progress<.8?Math.min(2,entries.length):entries.length;
-   const entry=entries[(group-1+wave-1)%fronts], route=entry[(Math.floor((group-1)/fronts)+wave+m.id)%entry.length];
+   const entry=entries[(group-1+recipeWave-1)%fronts], route=entry[(Math.floor((group-1)/fronts)+recipeWave+m.id)%entry.length];
    const formation=wave*100+group;
-   const support=cohort===Math.floor(groups*.6)&&limits.guardian?'guardian':cohort===groups-1&&limits.medic?'medic':null;
+   const support=interlude?null:cohort===Math.floor(groups*.6)&&limits.guardian?'guardian':cohort===groups-1&&limits.medic?'medic':null;
    const types=[];
    for(let i=0;i<size;i++) {
-    const seed=group*37+i*11+wave*7+m.id*19;
+    const seed=group*37+i*11+recipeWave*7+m.id*19;
     let type=pool[seed%pool.length];
     if((used[type]||0)>=(limits[type]??Infinity))type='swarm';
     used[type]=(used[type]||0)+1;types.push(type);
@@ -57,8 +97,8 @@ function planCampaignAttack(wave) {
    if(support){types[Math.floor(size/2)]=support;types[0]='scout';types[size-1]=stage>=12?'armor':'scout';}
    const groupSpeed=support?ENEMIES[support].speed:0;
    for(let i=0;i<types.length;i++) {
-    const type=types[i], seed=group*37+i*11+wave*7+m.id*19;
-    const elite=type!=='swarm'&&m.id>=4&&progress>=.65&&(seed%100<(m.difficulty===2?16:m.difficulty===1?8:Math.min(9,m.id*.3))||m.modifier==='Элитный эскорт'&&cohort===groups-1&&!isAirUnit(type)&&i%2===1);
+    const type=types[i], seed=group*37+i*11+recipeWave*7+m.id*19;
+    const elite=!interlude&&type!=='swarm'&&m.id>=4&&progress>=.65&&(seed%100<(m.difficulty===2?16:m.difficulty===1?8:Math.min(9,m.id*.3))||m.modifier==='Элитный эскорт'&&cohort===groups-1&&!isAirUnit(type)&&i%2===1);
     const gap=(support?.5:m.assault?.8-progress*.35:1.05-progress*.45)*(m.modifier==='Плотный строй'?.92:1);
     const hpScale=.4+.6*progress;
     out.push({type,elite,route,wave,group,formation,phase,groupSpeed,hpScale,spawnOffset:offset,gapAfter:gap,bounty:campaignBounty(type,elite)});
@@ -67,8 +107,18 @@ function planCampaignAttack(wave) {
    offset+=m.assault?2.4-progress*1.4:3-progress*1.2;
   }
  }
- if(wave===m.waves)scheduleCommander(out,wave);
+ if(wave===waveCount)scheduleCommander(out,wave);
  return out.sort((a,b)=>a.spawnOffset-b.spawnOffset);
+}
+function planCampaignAttack(wave){
+ const out=rawCampaignAttack(wave);
+ if(!extendedStandard())return out;
+ const e=standardEconomy();let cursor=(e.prefix[wave-1]||0)*e.killScale;
+ for(const item of out)if(item.type!=='boss'){
+  const before=Math.floor(cursor+1e-8);cursor+=campaignBounty(item.type,item.elite)*e.killScale;
+  item.bounty=Math.floor(cursor+1e-8)-before;
+ }
+ return out;
 }
 function scheduleCommander(out,wave) {
  const route=[...new Set(out.map(e=>e.route))].sort((a,b)=>ROUTES[b].length-ROUTES[a].length)[0];
