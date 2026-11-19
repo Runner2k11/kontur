@@ -1,0 +1,8 @@
+{
+  "major": 1,
+  "build": 28,
+  "runFormats": {
+    "campaign": 25,
+    "endless": 19
+  }
+}
