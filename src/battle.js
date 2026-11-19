@@ -92,8 +92,12 @@ function initialiseCombatEnemy(e,item) {
   e.bossKind=commanderKind(state.sectorId);
   if(e.bossKind>=0)e.armor=BOSS_KINDS[e.bossKind].armor;
   else e.armor=Math.min(10,4+Math.floor(state.sectorId/3));
-  e.commander={seed:(state.sectorId*7919+state.difficulty*104729+e.id*31337+1)>>>0,bag:[],nextAt:state.time+2.5,cast:null,armorUntil:0,repairUntil:0,healSpent:0,landed:0};
+  e.commander={seed:freshCommanderSeed(),nextAt:state.time+2.5,cast:null,armorUntil:0,repairUntil:0,healSpent:0,landed:0};
  }
+}
+function freshCommanderSeed() {
+ if(globalThis.crypto?.getRandomValues)return globalThis.crypto.getRandomValues(new Uint32Array(1))[0];
+ return Math.floor(Math.random()*4294967296)>>>0;
 }
 function commanderRandom(boss) {
  const data=boss.commander;
@@ -101,12 +105,8 @@ function commanderRandom(boss) {
  return data.seed/4294967296;
 }
 function commanderSkill(boss) {
- const data=boss.commander;
- if(!data.bag.length) {
-  data.bag=[...COMMANDER_SKILLS];
-  for(let i=data.bag.length-1;i>0;i--){const j=Math.floor(commanderRandom(boss)*(i+1));[data.bag[i],data.bag[j]]=[data.bag[j],data.bag[i]];}
- }
- return data.bag.shift();
+ const available=COMMANDER_SKILLS.filter(kind=>canCommanderCast(boss,kind));
+ return available[Math.floor(commanderRandom(boss)*available.length)];
 }
 function inCommanderRange(owner,target) {return target.hp>0&&Math.hypot(owner.x-target.x,owner.y-target.y)<=COMMANDER_RADIUS;}
 function healCombatEnemy(target,amount) {
@@ -129,16 +129,24 @@ function deployCommanderMinions(boss) {
   ring(e.x,e.y,'#ffd298',27,.6,'shield');data.landed++;
  }
 }
+function sabotageCandidates(boss) {
+ if(state.towers.some(t=>t.disabled)||state.bossShots.length)return [];
+ const dx=Math.cos(boss.angle),dy=Math.sin(boss.angle);
+ return state.towers.filter(t=>!t.disabled&&Math.hypot(t.x-boss.x,t.y-boss.y)<=6*CELL&&(t.x-boss.x)*dx+(t.y-boss.y)*dy>1e-6);
+}
 function sabotageTarget(boss) {
- if(state.towers.some(t=>t.disabled)||state.bossShots.length)return null;
- return state.towers.filter(t=>!t.disabled&&(t.repairGraceUntil||0)<=state.time&&Math.hypot(t.x-boss.x,t.y-boss.y)<=6*CELL)
-  .sort((a,b)=>Math.hypot(a.x-boss.x,a.y-boss.y)-Math.hypot(b.x-boss.x,b.y-boss.y)||a.id-b.id)[0]||null;
+ const candidates=sabotageCandidates(boss);
+ return candidates.length?candidates[Math.floor(commanderRandom(boss)*candidates.length)]:null;
+}
+function canCommanderCast(boss,kind) {
+ if(kind==='sabotage')return sabotageCandidates(boss).length>0;
+ if(kind==='repair')return boss.commander.healSpent<boss.maxHp*.24||state.enemies.some(e=>e!==boss&&e.hp<e.maxHp&&inCommanderRange(boss,e));
+ if(kind==='landing')return boss.commander.landed<24&&state.enemies.filter(e=>e.hp>0&&e.summonedBossId===boss.id).length<6;
+ return kind==='armor';
 }
 function beginCommanderCast(boss,kind) {
+ if(!canCommanderCast(boss,kind))return false;
  const target=kind==='sabotage'?sabotageTarget(boss):null;
- if(kind==='sabotage'&&!target)return false;
- if(kind==='repair'&&boss.commander.healSpent>=boss.maxHp*.24&&!state.enemies.some(e=>e!==boss&&e.hp<e.maxHp&&inCommanderRange(boss,e)))return false;
- if(kind==='landing'&&(boss.commander.landed>=24||state.enemies.filter(e=>e.hp>0&&e.summonedBossId===boss.id).length>=6))return false;
  boss.commander.cast={kind,startedAt:state.time,finishAt:state.time+(kind==='sabotage'?1.7:1),targetId:target?.id||0};
  if(kind==='sabotage'){announce('Босс наводится на башню. ЭМИ сорвёт выстрел.');notify('Диверсия! Босс наводится на '+TOWERS[target.type].name);}
  return true;
@@ -150,7 +158,7 @@ function finishCommanderCast(boss,cast) {
  if(cast.kind==='repair'){data.repairUntil=state.time+4;ring(boss.x,boss.y,'#a5ffb0',COMMANDER_RADIUS,.9,'shield');}
  if(cast.kind==='sabotage') {
   const target=state.towers.find(t=>t.id===cast.targetId);
-  if(target&&!target.disabled&&!state.towers.some(t=>t.disabled)&&!state.bossShots.length) {
+  if(target&&sabotageCandidates(boss).includes(target)) {
    state.bossShots.push({bossId:boss.id,targetId:target.id,x:boss.x,y:boss.y,startedAt:state.time,impactAt:state.time+.65});
    burst(boss.x,boss.y,'#ffd1ee',16);beep(170,.15,.04,'sawtooth');
   }
@@ -186,7 +194,7 @@ function tickCombatSupport(dt) {
  state.bossShots=state.bossShots.filter(shot=>{
   if(state.time<shot.impactAt)return true;
   const t=state.towers.find(t=>t.id===shot.targetId);
-  if(t&&!t.disabled&&(t.repairGraceUntil||0)<=state.time&&!state.towers.some(t=>t.disabled))disableCombatTower(t);
+  if(t&&!t.disabled&&!state.towers.some(t=>t.disabled))disableCombatTower(t);
   return false;
  });
 }
@@ -227,7 +235,7 @@ function tickTowerRepair(dt) {
  t.repairProgress=Math.min(REPAIR_SECONDS,(t.repairProgress||0)+dt/Math.max(1,speed));
  if(fullEffects&&Math.floor(state.time*18)!==t.repairSpark){t.repairSpark=Math.floor(state.time*18);burst(t.x+(fxNoise(state.time)*2-1)*16,t.y-8,'#c0ffe3',2);}
  if(t.repairProgress+1e-8>=REPAIR_SECONDS) {
-  t.disabled=false;t.repairProgress=0;t.repairGraceUntil=state.time+12;t.cooldown=.25;
+  t.disabled=false;t.repairProgress=0;delete t.repairGraceUntil;t.cooldown=.25;
   repairHold=null;burst(t.x,t.y,'#aeffcf',24);ring(t.x,t.y,'#aeffcf',48,.6,'shield');
   notify(TOWERS[t.type].name+' отремонтирована');saveProgress();uiDirty=true;
  }
@@ -373,7 +381,7 @@ function validateCombatState(run) {
   if(e.bossArmor!==undefined&&!finite(e.bossArmor,0,20))return false;
   if(!e.commander)continue;
   const d=e.commander;
-  if(!Number.isInteger(d.seed)||!finite(d.seed,0,4294967295)||!Array.isArray(d.bag)||d.bag.length>4||new Set(d.bag).size!==d.bag.length||d.bag.some(k=>!COMMANDER_SKILLS.includes(k))||!finite(d.nextAt)||!finite(d.armorUntil)||!finite(d.repairUntil)||!finite(d.healSpent,0,e.maxHp*.240001)||!Number.isInteger(d.landed)||!finite(d.landed,0,24))return false;
+  if(!Number.isInteger(d.seed)||!finite(d.seed,0,4294967295)||d.bag!==undefined&&(!Array.isArray(d.bag)||d.bag.length>4||new Set(d.bag).size!==d.bag.length||d.bag.some(k=>!COMMANDER_SKILLS.includes(k)))||!finite(d.nextAt)||!finite(d.armorUntil)||!finite(d.repairUntil)||!finite(d.healSpent,0,e.maxHp*.240001)||!Number.isInteger(d.landed)||!finite(d.landed,0,24))return false;
   if(d.cast&&(!COMMANDER_SKILLS.includes(d.cast.kind)||!finite(d.cast.startedAt,0,run.time)||!finite(d.cast.finishAt,d.cast.startedAt,d.cast.startedAt+2)||!Number.isSafeInteger(d.cast.targetId)))return false;
  }
  return true;

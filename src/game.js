@@ -1761,8 +1761,8 @@ function resumeSavedRun(mode){
  const saved=migrateV19Run(JSON.parse(JSON.stringify(appData.runs[mode])));saved.bossShots??=[];if(mode==='campaign'&&saved.rulesVersion!==30){startBattle('campaign',saved.sectorId,saved.difficulty);notify('Кампания переработана: бой начат заново. Пройденные сектора и технологии сохранены.');return true;}if(mode==='endless'&&saved.mapVersion!==19){startBattle('endless');notify('Дороги разнесены: бесконечный бой начат заново.');return true;}installRoutes(mode==='campaign'?sectorRoutes(saved.sectorId):ENDLESS_ROUTES);
  if(!validateRun(saved)){notify('Не удалось восстановить этот бой: сохранение повреждено. Остальной прогресс сохранён.',true);return false;}
  state=saved;state.bossShots??=[];for(const w of state.waves)w.totalThreat??=wavePlan(w.id).reduce((v,e)=>v+enemyThreat(e),0);state.rewardQueue=[];state.rewardedWaves=[];state.orbitalStrikes??=[];
- for(const e of state.enemies)Object.assign(e,pointOnPath(e.distance,e.route,isAirUnit(e)),{resolved:false,hit:0});
- for(const t of state.towers)Object.assign(t,{x:(t.c+.5)*CELL,y:(t.r+.5)*CELL,recoil:0});
+ for(const e of state.enemies){Object.assign(e,pointOnPath(e.distance,e.route,isAirUnit(e)),{resolved:false,hit:0});if(e.commander)delete e.commander.bag;}
+ for(const t of state.towers){Object.assign(t,{x:(t.c+.5)*CELL,y:(t.r+.5)*CELL,recoil:0});delete t.repairGraceUntil;}
  resetVisuals();particles=[];beams=[];floaters=[];startSession();makeLandscape();return true;
 }
 function deploySector(){
