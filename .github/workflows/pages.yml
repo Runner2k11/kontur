@@ -1,8 +1,12 @@
-name: Publish Kontur PWA
+name: Publish Kontur channels
+run-name: "КОНТУР — ${{ inputs.release }}"
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
+    inputs:
+      release:
+        description: Reviewed release being published
+        required: true
+        type: string
 permissions:
   contents: read
 concurrency:
@@ -13,19 +17,40 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
+        with:
+          ref: main
+          path: hosting
+      - id: sources
+        run: |
+          python - <<'PY'
+          import json, os
+          settings=json.load(open('hosting/deployment.json'))
+          with open(os.environ['GITHUB_OUTPUT'],'a') as stream:
+              stream.write('stable='+settings['stableRef']+'\n')
+              stream.write('test='+settings['testRef']+'\n')
+          PY
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ steps.sources.outputs.stable }}
+          path: stable
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ steps.sources.outputs.test }}
+          path: candidate
       - uses: actions/setup-python@v6
         with:
           python-version: '3.13'
-      - run: python scripts/build.py
-      - run: python -m unittest discover -s tests -v
+      - run: python hosting/scripts/build_site.py --stable stable --test candidate
+      - run: python -m unittest discover -s stable/tests -p test_build.py -v
+      - run: python -m unittest discover -s candidate/tests -p test_build.py -v
+      - run: python -m unittest discover -s hosting/tests -p test_host.py -v
       - run: |
-          node --check src/game.js
-          node --check src/pwa.js
-          node --check dist/sw.js
+          node --check hosting/site/sw.js
+          for file in hosting/site/assets/*.js; do node --check "$file"; done
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v4
         with:
-          path: dist
+          path: hosting/site
   deploy:
     needs: build
     runs-on: ubuntu-latest
