@@ -135,6 +135,9 @@ async function navigateLegacy(client){
 async function completeLegacyHandoff(){
  const cache=await caches.open(SHELL_CACHE),response=await cache.match(handoffKey);
  if(!response)return;
+ // This message is explicitly routed to registration.active. Its identity
+ // comes from the browser, never from a possibly stale CacheStorage marker.
+ await self.clients.claim();
  const ids=await response.json();await cache.delete(handoffKey);
  for(const id of ids){const client=await self.clients.get(id);if(client)await navigateLegacy(client);}
 }
@@ -158,16 +161,14 @@ async function applyShell(){
   throw Error('Заверши бой или закрой другие вкладки игры, затем обнови.');
  }
  const legacy=clients.filter((_client,index)=>answers[index].protocol!==HOST_PROTOCOL);
- const marker=await(await caches.open(META)).match(shellKey);
- if(marker&&await marker.json()===SHELL_ID){
-  // A legacy updater can retain a reference to a worker that is active now.
-  // skipWaiting() alone is then a no-op and leaves its stale notice in a loop.
-  await self.clients.claim();
-  for(const client of legacy)await navigateLegacy(client);
- }else{
-  await(await caches.open(SHELL_CACHE)).put(handoffKey,jsonResponse(legacy.map(client=>client.id)));
-  await self.skipWaiting();
- }
+ await(await caches.open(SHELL_CACHE)).put(handoffKey,jsonResponse(legacy.map(client=>client.id)));
+ // Cache writes survive an interrupted/failed activation. A stored shell ID
+ // therefore cannot prove that THIS worker is active. Always request
+ // activation; skipWaiting is harmless if this worker is already active.
+ await self.skipWaiting();
+ // If still waiting, activate will complete this worker's handoff afterwards.
+ // If already active, this message handles a legacy client's stale reference.
+ self.registration.active?.postMessage({type:'COMPLETE_LEGACY_HANDOFF'});
 }
 self.addEventListener('message',event=>{
  const message=event.data||{},port=event.ports[0],reply=value=>port?.postMessage({ok:true,value}),progress=(done,total)=>port?.postMessage({progress:{done,total}});
