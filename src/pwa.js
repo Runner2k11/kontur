@@ -29,10 +29,12 @@
  }
  function unfreeze(){prepared=false;document.body.classList.remove('pwa-updating');refreshNotice();}
  function refreshNotice(){
+  if(waiting&&registration?.waiting!==waiting){waiting=null;target=null;}
   notice.hidden=!waiting||appScreen!=='home';
   if(!waiting)return;
   text.textContent=prepared?'Обновляем игру…':testModeActive?'Новая версия готова. Выйди из тестового режима.':
    target&&!compatible(target.runFormats)?'Новая версия готова. Сначала заверши сохранённый бой.':
+   target?.hostProtocol===2?'Готово обновление загрузчика игры.':
    'Готова новая версия'+(target?' '+target.version:'')+'.';
   button.disabled=prepared||!target||!canUpdate(target.runFormats);
  }

@@ -2,7 +2,7 @@
 (() => {
  'use strict';
  const env=window.KONTUR_HOST;if(!env)return;
- let registration=env.registration,pending=null,catalog=null,prepared=false,busy=false,hadController=!!navigator.serviceWorker?.controller;
+ let registration=env.registration,pending=null,prepared=false,busy=false,hadController=!!navigator.serviceWorker?.controller;
  const notice=document.createElement('aside');notice.id='updateNotice';notice.hidden=true;notice.setAttribute('role','status');
  const message=document.createElement('span'),apply=document.createElement('button');apply.type='button';apply.textContent='Обновить';notice.append(message,apply);document.body.append(notice);
  const nativeKey=key=>env.channel==='test'?env.testPrefix+key:key;
@@ -32,16 +32,22 @@
   if(busy){apply.disabled=true;return;}
   if(!pending)return;
   const formats=pending.kind==='shell'?env.release.runFormats:pending.release.runFormats;
-  message.textContent=prepared?'Обновление…':!compatible(formats)?'Обновление готово. Сначала заверши сохранённый бой этой версии.':pending.kind==='shell'?'Готово обновление загрузчика игры.':'Готова '+(env.channel==='test'?'тестовая версия ':'версия ')+pending.release.version+'.';
+  message.textContent=prepared?'Обновление…':!compatible(formats)?'Обновление готово. Сначала заверши сохранённый бой этой версии.':pending.kind==='shell'||pending.release.version===env.release.version?'Готово обновление загрузчика игры.':'Готова '+(env.channel==='test'?'тестовая версия ':'версия ')+pending.release.version+'.';
   apply.textContent='Обновить';apply.disabled=prepared||!canPrepare(formats);
  }
  env.onProgress=progress=>{if(busy){message.textContent='Загрузка версии · '+progress.done+' / '+progress.total;notice.hidden=false;}};
  async function check(){
   if(busy||prepared)return;
   try{
-   catalog=await env.catalog();
-   if(registration?.waiting){pending={kind:'shell',worker:registration.waiting};}
-   else if(catalog[env.channel].buildId!==env.release.buildId)pending={kind:'channel',release:catalog[env.channel]};
+   const latest=await env.latest();
+   let waiting=registration?.waiting;
+   if(waiting){
+    const hello=await env.request(waiting,'HOST_PROTOCOL',{},1500).catch(()=>null);
+    // An old/duplicate worker is not a new release of this document.
+    if(!hello||hello.protocol!==2||hello.shellId===env.shellId||registration.waiting!==waiting)waiting=null;
+   }
+   if(waiting)pending={kind:'shell',worker:waiting};
+   else if(latest.buildId!==env.release.buildId)pending={kind:'channel',release:latest};
    else pending=null;
    if(registration?.active&&document.visibilityState==='visible')registration.update().catch(()=>{});
   }catch(_error){/* Cached builds remain available offline. */}
@@ -53,7 +59,7 @@
   busy=true;notice.hidden=false;message.textContent='Загрузка '+(next==='test'?'тестовой':'основной')+' версии…';apply.disabled=true;
   try{
    if(env.supportsChannels)await env.request(env.worker(),'ENSURE_CHANNEL',{channel:next});
-   else {const available=await env.catalog();if(!available[next])throw Error('Версия пока недоступна.');}
+   else await env.latest(next);
    // Switching never rewrites the other channel's profile or saved battle.
    env.select(next);location.reload();return true;
   }catch(error){busy=false;notice.hidden=true;notify(error.message,true);refreshNotice();return false;}
@@ -80,7 +86,7 @@
   if(data.type==='CHANNEL_UPDATED'&&data.channel===env.channel)location.reload();
  });
  document.addEventListener('click',event=>{if(prepared||busy){event.preventDefault();event.stopImmediatePropagation();}},true);
- navigator.serviceWorker?.addEventListener('controllerchange',()=>{if(hadController)location.reload();else{hadController=true;env.request(env.worker(),'HOST_PROTOCOL',{},1500).then(reply=>{env.supportsChannels=reply.protocol===2;}).catch(()=>{});}});
+ navigator.serviceWorker?.addEventListener('controllerchange',()=>{if(hadController)location.reload();else{hadController=true;env.request(env.worker(),'HOST_PROTOCOL',{},1500).then(reply=>{env.supportsChannels=reply.protocol===2;env.shellId=reply.shellId||null;check();}).catch(()=>{});}});
  let taps=0,last=0;
  $('gameVersion').addEventListener('click',event=>{
   event.preventDefault();event.stopImmediatePropagation();

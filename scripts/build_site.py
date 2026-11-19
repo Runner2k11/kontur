@@ -55,20 +55,21 @@ def assemble(stable_source,test_source,output_parent=None):
         hosted_game=asset('game-hosted','js',game)
         html=html.replace(game_path,hosted_game['url'])
         html=re.sub(r'<script defer src="assets/pwa-[^"]+"></script>','',html)
-        html=html.replace('</body>',f'<script defer src="{client["url"]}"></script>\n</body>')
+        # The adapter belongs to the common shell, not either game release.
+        # Updating it must never masquerade as a new stable/test game version.
         entry=write(f'apps/{channel}-{sha(html.encode())[:20]}.html',html)
         inventory=[file for file in files if file['url'].startswith('assets/') and not file['url'].startswith(('assets/game-','assets/pwa-'))]
-        inventory += [hosted_game,client,entry]
+        inventory += [hosted_game,entry]
         content_id=sha(json.dumps(inventory,sort_keys=True).encode())[:20]
         catalog[channel]={'channel':channel,'version':release['version'],'buildId':content_id,
             'entry':entry['url'],'runFormats':release['runFormats'],'files':inventory,
             'sourceBuildId':release['buildId']}
 
-    boot=asset('host-boot','js',(ROOT/'hosting/boot.js').read_bytes())
+    boot=asset('host-boot','js',(ROOT/'hosting/boot.js').read_text(encoding='utf-8').replace('__CLIENT__',client['url']))
     manifest=json.loads((sources['stable']/'dist/manifest.webmanifest').read_text(encoding='utf-8'))
     icon=re.search(r'<link rel="icon"[^>]+href="([^"]+)"',(sources['stable']/'dist/index.html').read_text(encoding='utf-8'))[1]
     html=(ROOT/'hosting/index.html').read_text(encoding='utf-8').replace('__BOOT__',boot['url']).replace('__ICON__',icon)
-    shell_files=[write('index.html',html),write('manifest.webmanifest',json.dumps(manifest,ensure_ascii=False,indent=2)),boot]
+    shell_files=[write('index.html',html),write('manifest.webmanifest',json.dumps(manifest,ensure_ascii=False,indent=2)),boot,client]
     shell_files+=[next(file for file in built['stable'][1] if file['url']==icon)]
     for item in manifest['icons']:
         shell_files+=[next(file for file in built['stable'][1] if file['url']==item['src'])]
@@ -77,6 +78,8 @@ def assemble(stable_source,test_source,output_parent=None):
     worker=template.replace('__SHELL_ID__',shell_id).replace('__SHELL_FILES__',json.dumps(shell_files))
     write('sw.js',worker)
     write('channels.json',json.dumps(catalog,ensure_ascii=False,indent=2))
+    for channel in ['stable','test']:
+        write('releases/'+channel+'.json',json.dumps(catalog[channel],ensure_ascii=False,indent=2))
     write('release.json',json.dumps({'version':catalog['stable']['version'],'buildId':shell_id,'runFormats':catalog['stable']['runFormats'],'hostProtocol':2},indent=2))
     (out/'.nojekyll').touch()
     print(f"Site: stable {catalog['stable']['version']}, test {catalog['test']['version']}, shell {shell_id}")
