@@ -520,7 +520,7 @@ const CAMERA={center:{x:WIDTH/2,y:HEIGHT/2},ready:false};
 const CAMERA_INPUT={points:new Map(),gesture:null,blocked:false,until:0};
 
 const UI={context:null,cell:null,anchor:null,modalBasePaused:true};
-const MODALS=['menuDialog','helpDialog','resetDialog','intelDialog','researchDialog','missionDetailsDialog','sectorMapDialog','entryForecastDialog'];
+const MODALS=['menuDialog','helpDialog','resetDialog','intelDialog','researchDialog','missionDetailsDialog','sectorMapDialog'];
 function worldToScreen(x,y){return VIEW.rotated?{x:VIEW.x+(HEIGHT-y)*VIEW.scale,y:VIEW.y+x*VIEW.scale}:{x:VIEW.x+x*VIEW.scale,y:VIEW.y+y*VIEW.scale};}
 function screenToWorld(x,y){
  const wx=VIEW.rotated?(y-VIEW.y)/VIEW.scale:(x-VIEW.x)/VIEW.scale,wy=VIEW.rotated?HEIGHT-(x-VIEW.x)/VIEW.scale:(y-VIEW.y)/VIEW.scale;
@@ -691,7 +691,7 @@ function openArsenal(){
 }
 function showDialog(id){
  if(battleResultPending())return;
- closePerkTooltip();if($(id).open)return;if(!anyDialogOpen())UI.modalBasePaused=paused;
+ closeEntryForecast();closePerkTooltip();if($(id).open)return;if(!anyDialogOpen())UI.modalBasePaused=paused;
  closeContextPanel();setPause(true);$(id).showModal();uiDirty=true;
 }
 function closeDialog(id){
@@ -700,7 +700,7 @@ function closeDialog(id){
  if(!anyDialogOpen()){if(sessionStarted)setPause(UI.modalBasePaused);else paused=true;}
  uiDirty=true;
 }
-function closeAllDialogs(){for(const id of MODALS)if($(id).open)$(id).close();}
+function closeAllDialogs(){closeEntryForecast();for(const id of MODALS)if($(id).open)$(id).close();}
 function openMenu(){showDialog('menuDialog');}
 function startSession(){
  if(ART.loading)return;
@@ -736,14 +736,15 @@ function initShell(restored){
  $('startGameBtn').addEventListener('click',()=>openCommandCenter());$('splashMenuBtn').addEventListener('click',openMenu);$('menuBtn').addEventListener('click',openMenu);
  $('menuResumeBtn').addEventListener('click',resumeMenu);$('closeMenuBtn').addEventListener('click',()=>closeDialog('menuDialog'));
  $('intelBtn').addEventListener('click',()=>showDialog('intelDialog'));$('closeIntelBtn').addEventListener('click',()=>closeDialog('intelDialog'));
- $('closeEntryForecast').addEventListener('click',()=>closeDialog('entryForecastDialog'));
+ document.addEventListener('pointerdown',e=>{if(!e.target.closest?.('.attack-marker')&&!$('entryForecastPopover').contains(e.target))closeEntryForecast();});
+ document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!$('entryForecastPopover').hidden){closeEntryForecast();e.preventDefault();e.stopImmediatePropagation();}},true);
  $('arsenalBtn').addEventListener('click',openArsenal);$('closeContextBtn').addEventListener('click',()=>closeContextPanel());$('cancelBuildBtn').addEventListener('click',()=>closeContextPanel());
  $('fullscreenBtn').addEventListener('click',async()=>{
   try{if(document.fullscreenElement)await document.exitFullscreen();else await document.documentElement.requestFullscreen();$('menuMessage').textContent='';fitCanvas();}
   catch(e){$('menuMessage').textContent='Полноэкранный режим недоступен в этом окне. Карта уже подстроена под размер браузера.';}
   uiDirty=true;
  });
- for(const id of ['menuDialog','intelDialog','entryForecastDialog'])$(id).addEventListener('cancel',e=>{e.preventDefault();closeDialog(id);});
+ for(const id of ['menuDialog','intelDialog'])$(id).addEventListener('cancel',e=>{e.preventDefault();closeDialog(id);});
  document.addEventListener('pointerdown',e=>{
   if(!UI.context||e.target===canvas||$('contextPanel').contains(e.target)||e.target.closest?.('#arsenalBtn'))return;
   closeContextPanel();

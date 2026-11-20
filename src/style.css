@@ -392,7 +392,7 @@ dialog{color:var(--text);background:#102431;border:1px solid #638390;border-radi
 .sector-star-summary{display:grid;gap:3px;margin:6px 0 0;color:#ebce89;font-size:11px;line-height:1.25}.sector-star-summary>span{white-space:nowrap}.sector-star-summary b{color:#819eac;margin-right:3px;font-size:9px}.sector-node{min-height:178px}.intel-summary{min-width:0}.wave-preview{grid-template-columns:repeat(auto-fit,minmax(88px,1fr))}.enemy-chip strong{white-space:normal;text-align:center;line-height:1.25}.enemy-chip small{text-align:center;line-height:1.25}
 /* Four planets, sector chains and an always available launch dock. */
 #campaignScreen{padding-bottom:220px;scroll-padding-bottom:220px}
-.command-header{position:sticky;top:-22px;z-index:4;background:#0b1b29f5;padding:14px 0;backdrop-filter:blur(16px)}
+.command-header{position:sticky;top:-22px;z-index:4;background:#0b1b29f5;padding:14px;backdrop-filter:blur(16px)}
 .command-heading{margin:20px auto 17px}.command-heading h1{font-size:27px;margin:0}.command-heading>span{display:none}.command-heading p:empty{display:none}
 .command-content{display:block}.planet-row{display:grid;grid-template-columns:155px minmax(0,1fr);align-items:center;gap:18px;padding:18px;border:1px solid #58778955;border-radius:13px;background:linear-gradient(110deg,#223b4b70,#10213080);margin-bottom:15px}
 .planet-info{display:flex;flex-direction:column;align-items:center;text-align:center;min-width:0}.planet-portrait{width:112px;height:112px;object-fit:contain;filter:drop-shadow(0 0 20px #7bbbd62a)}.planet-info small{font-size:8px;color:#7d9bad;letter-spacing:.15em}.planet-info h2{margin:6px 0;font-size:18px;font-weight:550;color:var(--sector-color)}.planet-info div>span{font-size:10px;color:#8faebf}
@@ -405,8 +405,8 @@ dialog{color:var(--text);background:#102431;border:1px solid #638390;border-radi
 #commandTechBtn{background:#213f4d;color:#bad1dd;border:1px solid #537d8d;box-shadow:none}#commandTechBtn.has-points{background:linear-gradient(120deg,#d4fc82,#a8e66d);color:#173124;border-color:#d2fa8c;box-shadow:0 0 23px #b8f57c55;animation:tech-callout 2.3s ease-in-out infinite}#commandTechBtn.has-points:before{content:'';width:7px;height:7px;border-radius:50%;background:#2d642d;box-shadow:0 0 0 4px #42752926}@keyframes tech-callout{50%{box-shadow:0 0 32px #b8f57c88}}
 .battle-menu-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:0 0 15px}.battle-menu-actions #menuResumeBtn{grid-column:1/-1;margin:0}.battle-menu-actions>button{min-height:43px}.battle-menu-actions .danger{color:#f0b4a0;border-color:#a7756766}
 @media(max-width:1100px){#missionCard{grid-template-columns:minmax(200px,1fr) minmax(310px,1fr);gap:14px;padding:13px 15px}#sectorPreview{width:110px}.mission-overview{gap:12px}.planet-row{grid-template-columns:115px minmax(0,1fr);gap:8px}.planet-portrait{width:94px;height:94px}.planet-info h2{font-size:16px}#sectorName{font-size:20px}}
-@media(max-width:700px){#campaignScreen{padding:10px 10px 265px;scroll-padding-bottom:265px}.command-header{top:-10px;gap:8px;flex-wrap:wrap;padding:8px 0 11px}.command-header img{width:100px;height:34px;margin-left:0}.command-header .command-stat{display:none}.command-header #commandTechBtn{margin-left:auto;min-height:36px;padding:8px 11px;font-size:10px}.command-header #commandHomeBtn{font-size:9px;padding:7px 8px}.command-heading{margin:14px auto}.command-heading h1{font-size:22px}.planet-row{grid-template-columns:83px minmax(0,1fr);gap:8px;padding:10px 8px;margin-bottom:11px}.planet-portrait{width:78px;height:78px}.planet-info h2{font-size:14px;margin:5px 0}.planet-info small{font-size:6px}.planet-info div>span{font-size:8px}.sector-node{min-width:75px;min-height:116px}.sector-node strong{font-size:9px}#missionCard{left:8px;right:8px;bottom:8px;display:flex;flex-direction:column;gap:10px;padding:11px 12px;margin:0;border-radius:10px}.mission-overview{gap:10px;align-items:center}#sectorPreview{width:85px}#sectorName{font-size:18px;margin:5px 0 7px}#sectorKicker{font-size:7px}#sectorFacts{gap:12px}#sectorFacts b{font-size:12px}#sectorFacts span{font-size:8px}#sectorFacts .sector-star-summary{font-size:12px}.mission-decisions{gap:8px}.difficulty-option{padding:7px 3px;gap:3px}.difficulty-option strong{font-size:10px}.difficulty-option small{font-size:7px}.mission-actions .secondary{min-height:39px;font-size:10px;padding:8px 14px}#deployBtn{min-height:40px;font-size:11px}#missionReward{font-size:8px}.command-footer{margin-top:12px;font-size:9px}}
-@media(max-height:550px) and (min-width:701px){#campaignScreen{padding-bottom:165px}.command-heading{margin:9px auto}.command-heading h1{font-size:20px}.command-header{padding:7px 0}.command-header img{height:30px}#missionCard{padding:10px 14px;bottom:8px}#sectorPreview{width:100px}#sectorName{font-size:19px}.planet-row{padding:9px}.planet-portrait{width:80px;height:80px}}
+@media(max-width:700px){#campaignScreen{padding:10px 10px 265px;scroll-padding-bottom:265px}.command-header{top:-10px;gap:8px;flex-wrap:wrap;padding:10px}.command-header img{width:100px;height:34px;margin-left:0}.command-header .command-stat{display:none}.command-header #commandTechBtn{margin-left:auto;min-height:36px;padding:8px 11px;font-size:10px}.command-header #commandHomeBtn{font-size:9px;padding:7px 8px}.command-heading{margin:14px auto}.command-heading h1{font-size:22px}.planet-row{grid-template-columns:83px minmax(0,1fr);gap:8px;padding:10px 8px;margin-bottom:11px}.planet-portrait{width:78px;height:78px}.planet-info h2{font-size:14px;margin:5px 0}.planet-info small{font-size:6px}.planet-info div>span{font-size:8px}.sector-node{min-width:75px;min-height:116px}.sector-node strong{font-size:9px}#missionCard{left:8px;right:8px;bottom:8px;display:flex;flex-direction:column;gap:10px;padding:11px 12px;margin:0;border-radius:10px}.mission-overview{gap:10px;align-items:center}#sectorPreview{width:85px}#sectorName{font-size:18px;margin:5px 0 7px}#sectorKicker{font-size:7px}#sectorFacts{gap:12px}#sectorFacts b{font-size:12px}#sectorFacts span{font-size:8px}#sectorFacts .sector-star-summary{font-size:12px}.mission-decisions{gap:8px}.difficulty-option{padding:7px 3px;gap:3px}.difficulty-option strong{font-size:10px}.difficulty-option small{font-size:7px}.mission-actions .secondary{min-height:39px;font-size:10px;padding:8px 14px}#deployBtn{min-height:40px;font-size:11px}#missionReward{font-size:8px}.command-footer{margin-top:12px;font-size:9px}}
+@media(max-height:550px) and (min-width:701px){#campaignScreen{padding-bottom:165px}.command-heading{margin:9px auto}.command-heading h1{font-size:20px}.command-header{padding:7px}.command-header img{height:30px}#missionCard{padding:10px 14px;bottom:8px}#sectorPreview{width:100px}#sectorName{font-size:19px}.planet-row{padding:9px}.planet-portrait{width:80px;height:80px}}
 @media(prefers-reduced-motion:reduce){#commandTechBtn.has-points{animation:none}}
 
 
@@ -451,18 +451,12 @@ body[data-screen="campaign"] #testLabDock{position:relative;left:auto;bottom:aut
 .attack-marker:focus-visible{outline:2px solid #d4fa7a;outline-offset:4px}
 .attack-marker.boss-warning{--marker-color:#ffc38a}
 .attack-marker.waiting:before{opacity:.15}
-#entryForecastDialog{max-width:400px}
-#entryForecastDialog .menu-header{gap:15px}
-#entryForecastDialog h2{font-size:19px}
-#entryForecastRoutes{margin:0 0 12px;color:#83adbf;font-size:10px;letter-spacing:.04em}
-#entryForecastSummary{display:block;color:#e2f4f8;font-size:13px}
-#entryForecastClock{color:#d4fa7a;margin:6px 0 18px}
-#entryForecastTypes{display:grid;gap:7px}
-.entry-forecast-unit{display:flex;align-items:center;gap:12px;padding:10px 12px;background:#193441;border:1px solid #3e64744f;border-radius:8px;color:var(--unit-color)}
-.entry-forecast-unit>svg{width:25px;height:25px;flex:none}
-.entry-forecast-unit>div{display:grid;gap:3px;flex:1}
-.entry-forecast-unit strong{color:#e1f2f6;font-size:12px;font-weight:550}
-.entry-forecast-unit small{color:#91b0bd;font-size:10px}
-.entry-forecast-unit>b{color:var(--unit-color);font:600 16px ui-monospace,monospace}
-#entryForecastDialog .entry-forecast-note{margin:17px 0 0;font-size:10px;color:#8ba7b6}
+/* Keep the centered clock anchored while the generic button press style runs. */
+.attack-marker:active:not(:disabled){transform:translate(-50%,-50%)}
+.attack-marker{transition:background .15s,border-color .15s,box-shadow .15s}
+.entry-forecast-popover{position:fixed;z-index:8;width:max-content;max-width:calc(100vw - 16px);padding:8px;background:#102c39f5;border:1px solid #85c2ce88;border-radius:10px;box-shadow:0 5px 18px #0006;pointer-events:auto}
+#entryForecastTypes{display:grid;grid-template-columns:repeat(var(--columns,1),max-content);gap:6px 8px}
+.entry-forecast-unit{display:inline-flex;align-items:center;justify-content:center;gap:4px;min-width:52px;height:30px;color:var(--unit-color)}
+.entry-forecast-unit .unit-portrait{width:30px;height:27px;object-fit:contain;margin:0}
+.entry-forecast-unit>b{color:var(--unit-color);font:600 12px ui-monospace,monospace;white-space:nowrap}
 .battle-settling #gameHud button{pointer-events:none}

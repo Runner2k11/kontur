@@ -8,6 +8,7 @@ const repairPointers = new Set();
 const CAMPAIGN_ECONOMY = new Map();
 const BATTLE_RESULT_DELAY = 2000;
 const BATTLE_RESULT = {run:null,until:0};
+const ENTRY_FORECAST = {run:null,key:null,stamp:''};
 
 function beginBattleResult(){
  BATTLE_RESULT.run=state;BATTLE_RESULT.until=performance.now()+BATTLE_RESULT_DELAY;
@@ -422,7 +423,7 @@ function paintAttackForecast() {
  }
  for(const button of [...layer.children])if(!groups.has(button.dataset.entry))button.remove();
  layer.hidden=!groups.size;
- if(!groups.size)return;
+ if(!groups.size){closeEntryForecast();return;}
  const placed=[],origin=canvas.getBoundingClientRect();
  const hud=['topHud','bonusHud','cameraControls','battleSector'].map(id=>$(id).getBoundingClientRect()).filter(r=>r.width&&r.height);
  const top=Math.max(30,...hud.map(r=>r.bottom-origin.top+30));
@@ -435,7 +436,7 @@ function paintAttackForecast() {
   if(free){x=free.x;y=free.y;}
   placed.push({x,y});
   let button=[...layer.children].find(el=>el.dataset.entry===key);
-  if(!button){button=document.createElement('button');button.type='button';button.className='attack-marker';button.dataset.entry=key;button.setAttribute('aria-haspopup','dialog');button.setAttribute('aria-controls','entryForecastDialog');button.innerHTML='<span aria-hidden="true"></span>';button.addEventListener('click',()=>showEntryForecast(key));layer.append(button);}
+  if(!button){button=document.createElement('button');button.type='button';button.className='attack-marker';button.dataset.entry=key;button.setAttribute('aria-controls','entryForecastPopover');button.setAttribute('aria-expanded','false');button.innerHTML='<span aria-hidden="true"></span>';button.addEventListener('click',()=>showEntryForecast(key));layer.append(button);}
   const clock=attackForecastClock(g.items);
   button.style.left=x+'px';button.style.top=y+'px';button.style.setProperty('--remaining',(360*clock.progress).toFixed(2)+'deg');
   button.classList.toggle('boss-warning',g.items.some(item=>item.type==='boss'));
@@ -443,6 +444,7 @@ function paintAttackForecast() {
   button.firstElementChild.textContent=state.difficulty>0?'›':String(state.wave+1).padStart(2,'0');
   button.setAttribute('aria-label',forecast.label+'. '+ROUTES[g.route].name+'. '+clock.label+'. Нажми, чтобы узнать состав.');
  }
+ refreshEntryForecast(forecast,groups.get(ENTRY_FORECAST.key)?.items||[]);
 }
 function forecastItems(forecast=nextAttackForecast()){
  return state.difficulty>0&&!state.wave?forecast.items.filter(q=>q.group===forecast.items[0]?.group):forecast.items;
@@ -461,13 +463,35 @@ function attackForecastClock(items){
 function showEntryForecast(key){
  const forecast=nextAttackForecast(),items=forecastItems(forecast).filter(item=>ROUTES[item.route].cells[0].join(',')===key);
  if(!items.length||anyDialogOpen()||battleResultPending())return;
- const types=[...new Set(items.map(item=>item.type))],routes=[...new Set(items.map(item=>ROUTES[item.route].name))],air=items.filter(isAirUnit).length;
- $('entryForecastTitle').textContent=forecast.label;
- $('entryForecastRoutes').textContent=routes.join(' · ');
- $('entryForecastSummary').textContent=items.length+' врагов · земля '+(items.length-air)+' · воздух '+air;
- $('entryForecastClock').textContent=attackForecastClock(items).label;
- $('entryForecastTypes').innerHTML=types.map(type=>{const group=items.filter(item=>item.type===type),elite=group.filter(item=>item.elite).length;return '<div class="entry-forecast-unit" style="--unit-color:'+ENEMIES[type].color+'">'+unitIcon(type)+'<div><strong>'+ENEMIES[type].name+'</strong><small>'+(isAirUnit(type)?'Воздух':'Земля')+(elite?' · элита '+elite:'')+'</small></div><b>×'+group.length+'</b></div>';}).join('');
- showDialog('entryForecastDialog');
+ if(ENTRY_FORECAST.run===state&&ENTRY_FORECAST.key===key&&!$('entryForecastPopover').hidden){closeEntryForecast();return;}
+ closeEntryForecast();ENTRY_FORECAST.run=state;ENTRY_FORECAST.key=key;ENTRY_FORECAST.stamp=entryForecastStamp(forecast);
+ $('entryForecastPopover').hidden=false;refreshEntryForecast(forecast,items);
+}
+function entryForecastStamp(forecast){return state.wave+'/'+forecast.label+'/'+(state.difficulty>0?forecast.items[0]?.group:'wave');}
+function closeEntryForecast(){
+ ENTRY_FORECAST.run=null;ENTRY_FORECAST.key=null;ENTRY_FORECAST.stamp='';
+ const pop=$('entryForecastPopover');pop.hidden=true;delete pop.dataset.roster;
+ for(const button of $('attackMarkers').children)button.setAttribute('aria-expanded','false');
+}
+function refreshEntryForecast(forecast,items){
+ const pop=$('entryForecastPopover');if(pop.hidden)return;
+ const button=[...$('attackMarkers').children].find(el=>el.dataset.entry===ENTRY_FORECAST.key);
+ if(ENTRY_FORECAST.run!==state||!button||!items.length||anyDialogOpen()||entryForecastStamp(forecast)!==ENTRY_FORECAST.stamp){closeEntryForecast();return;}
+ const types=[...new Set(items.map(item=>item.type))],counts=types.map(type=>items.filter(item=>item.type===type).length),roster=types.map((type,i)=>type+':'+counts[i]).join('/');
+ if(pop.dataset.roster!==roster){
+  pop.dataset.roster=roster;$('entryForecastTypes').style.setProperty('--columns',Math.min(4,types.length));
+  $('entryForecastTypes').innerHTML=types.map((type,i)=>'<span class="entry-forecast-unit" style="--unit-color:'+ENEMIES[type].color+'" role="img" aria-label="'+ENEMIES[type].name+': '+counts[i]+'" title="'+ENEMIES[type].name+'">'+unitIcon(type)+'<b>×'+counts[i]+'</b></span>').join('');
+ }
+ button.setAttribute('aria-expanded','true');positionEntryForecast(button);
+}
+function positionEntryForecast(button){
+ const pop=$('entryForecastPopover'),a=button.getBoundingClientRect(),w=pop.offsetWidth,h=pop.offsetHeight,gap=8;
+ const obstacles=['topHud','bonusHud','cameraControls','battleSector','commandBar'].map(id=>$(id).getBoundingClientRect()).filter(r=>r.width&&r.height);
+ obstacles.push(...[...$('attackMarkers').children].map(el=>el.getBoundingClientRect()));
+ const overlap=(p,r)=>Math.max(0,Math.min(p.x+w,r.right)-Math.max(p.x,r.left))*Math.max(0,Math.min(p.y+h,r.bottom)-Math.max(p.y,r.top));
+ const options=[{x:(a.left+a.right-w)/2,y:a.top-h-gap},{x:(a.left+a.right-w)/2,y:a.bottom+gap},{x:a.right+gap,y:(a.top+a.bottom-h)/2},{x:a.left-w-gap,y:(a.top+a.bottom-h)/2}].map(p=>({x:clamp(p.x,8,Math.max(8,innerWidth-w-8)),y:clamp(p.y,8,Math.max(8,innerHeight-h-8))}));
+ options.sort((p,q)=>obstacles.reduce((sum,r)=>sum+overlap(p,r)-overlap(q,r),0));
+ pop.style.left=Math.round(options[0].x)+'px';pop.style.top=Math.round(options[0].y)+'px';
 }
 function validateCombatState(run) {
  const finite=(n,min=0,max=Number.MAX_SAFE_INTEGER)=>Number.isFinite(n)&&n>=min&&n<=max;
