@@ -422,12 +422,17 @@ function paintAttackForecast() {
  }
  for(const button of [...layer.children])if(!groups.has(button.dataset.entry))button.remove();
  layer.hidden=!groups.size;
- const placed=[],phone=VIEW.w<600;
+ if(!groups.size)return;
+ const placed=[],origin=canvas.getBoundingClientRect();
+ const hud=['topHud','bonusHud','cameraControls','battleSector'].map(id=>$(id).getBoundingClientRect()).filter(r=>r.width&&r.height);
+ const top=Math.max(30,...hud.map(r=>r.bottom-origin.top+30));
+ const bottom=Math.max(top,Math.min(VIEW.h-30,$('commandBar').getBoundingClientRect().top-origin.top-30));
+ const offsets=[-104,-52,0,52,104].flatMap(dx=>[-104,-52,0,52,104].map(dy=>({dx,dy}))).sort((a,b)=>a.dx*a.dx+a.dy*a.dy-b.dx*b.dx-b.dy*b.dy);
  for(const [key,g] of groups) {
   const p=pointOnRoute(ROUTES[g.route],CELL*.9),screen=worldToScreen(p.x,p.y);
-  const top=phone?164:138,bottom=Math.max(top,VIEW.h-(phone?164:110));
   let x=clamp(screen.x,30,VIEW.w-30),y=clamp(screen.y,top,bottom);
-  for(const other of placed)if(Math.hypot(other.x-x,other.y-y)<52){x=clamp(other.x+54,30,VIEW.w-30);if(Math.hypot(other.x-x,other.y-y)<52)y=clamp(other.y+54,top,bottom);}
+  const free=offsets.map(({dx,dy})=>({x:clamp(x+dx,30,VIEW.w-30),y:clamp(y+dy,top,bottom)})).find(p=>placed.every(other=>Math.hypot(other.x-p.x,other.y-p.y)>=52));
+  if(free){x=free.x;y=free.y;}
   placed.push({x,y});
   let button=[...layer.children].find(el=>el.dataset.entry===key);
   if(!button){button=document.createElement('button');button.type='button';button.className='attack-marker';button.dataset.entry=key;button.setAttribute('aria-haspopup','dialog');button.setAttribute('aria-controls','entryForecastDialog');button.innerHTML='<span aria-hidden="true"></span>';button.addEventListener('click',()=>showEntryForecast(key));layer.append(button);}

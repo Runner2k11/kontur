@@ -1129,7 +1129,7 @@ function refreshUI(){
  const ended=state.phase==='lose';$('boardOverlay').dataset.ended=String(ended);$('pauseShortcut').hidden=ended;$('boardOverlay').hidden=!sessionStarted||anyDialogOpen()||(!paused&&!ended);
  if(ended){$('overlaySymbol').innerHTML=LOSE_ICON;$('overlayTitle').textContent='Ядро потеряно.';$('overlayText').textContent='Отбито волн: '+state.completed+' · Уничтожено: '+state.kills+' · Очки: '+state.score.toLocaleString('ru-RU');$('overlayAction').textContent='Новая оборона';}
  else if(paused){$('overlaySymbol').innerHTML=PAUSE_ICON;$('overlayTitle').textContent='Пауза';$('overlayText').textContent='Таймер и бой остановлены. Продолжай, когда будешь готов.';$('overlayAction').textContent='Продолжить';}
- refreshShellUI();refreshProgressionUI();refreshCampaignUI();
+ refreshShellUI();refreshProgressionUI();refreshCampaignUI();paintAttackForecast();
 }
 function setPause(value){if(state.phase==='lose'||state.phase==='win')return;if(!value&&state.rewardQueue.length){uiDirty=true;return;}paused=value;if(value)saveProgress();uiDirty=true;}
 
