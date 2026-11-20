@@ -1,7 +1,7 @@
 {
   "major": 1,
   "build": 30,
-  "testBuild": 5,
+  "testBuild": 6,
   "runFormats": {
     "campaign": 30,
     "endless": 19

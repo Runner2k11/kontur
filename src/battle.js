@@ -6,6 +6,22 @@ const COMMANDER_NAMES = {landing:'ВЫСАДКА', armor:'БРОНЕКУПОЛ',
 let repairHold = null;
 const repairPointers = new Set();
 const CAMPAIGN_ECONOMY = new Map();
+const BATTLE_RESULT_DELAY = 2000;
+const BATTLE_RESULT = {run:null,until:0};
+
+function beginBattleResult(){
+ BATTLE_RESULT.run=state;BATTLE_RESULT.until=performance.now()+BATTLE_RESULT_DELAY;
+ closeAllDialogs();closeContextPanel();uiDirty=true;
+}
+function battleResultPending(){
+ return sessionStarted&&BATTLE_RESULT.run===state&&['win','lose'].includes(state.phase)&&performance.now()<BATTLE_RESULT.until;
+}
+function tickBattleResult(dt){
+ if(BATTLE_RESULT.run!==state||!BATTLE_RESULT.until)return;
+ // Only debris and graphics continue; the battle and its recorded time are over.
+ advanceDebris(dt);updateVisuals(dt);
+ if(performance.now()>=BATTLE_RESULT.until){BATTLE_RESULT.until=0;uiDirty=true;}
+}
 
 function legacyCampaignWaves(id){return 6+Math.floor(id/6);}
 function extendedStandard(run=state){return run.mode==='campaign'&&run.difficulty===0&&run.encounterVersion>=31;}
@@ -397,29 +413,56 @@ function nextAttackForecast() {
  return {items:wavePlan(state.wave+1),label:assault?'ПЕРВЫЙ ОТРЯД':'ВОЛНА '+(state.wave+1)};
 }
 function paintAttackForecast() {
- const forecast=nextAttackForecast(),groups=new Map();
- const items=state.difficulty>0&&!state.wave?forecast.items.filter(q=>q.group===forecast.items[0]?.group):forecast.items;
+ const forecast=nextAttackForecast(),groups=new Map(),layer=$('attackMarkers');
+ const items=forecastItems(forecast);
  for(const item of items) {
   const route=ROUTES[item.route],key=route.cells[0].join(',');
-  if(!groups.has(key))groups.set(key,{route:item.route,ground:0,air:0,boss:false});
-  const g=groups.get(key);g[isAirUnit(item)?'air':'ground']++;g.boss||=item.type==='boss';
+  if(!groups.has(key))groups.set(key,{route:item.route,items:[]});
+  groups.get(key).items.push(item);
  }
- if(!groups.size)return;
- ctx.save();ctx.setTransform(VIEW.ratio,0,0,VIEW.ratio,0,0);
+ for(const button of [...layer.children])if(!groups.has(button.dataset.entry))button.remove();
+ layer.hidden=!groups.size;
  const placed=[],phone=VIEW.w<600;
- for(const g of groups.values()) {
+ for(const [key,g] of groups) {
   const p=pointOnRoute(ROUTES[g.route],CELL*.9),screen=worldToScreen(p.x,p.y);
-  let x=clamp(screen.x,77,VIEW.w-77),y=clamp(screen.y,phone?168:145,VIEW.h-(phone?164:120));
-  for(const other of placed)if(Math.abs(other.x-x)<145&&Math.abs(other.y-y)<48)y=clamp(other.y+52,phone?168:145,VIEW.h-(phone?164:120));
+  const top=phone?164:138,bottom=Math.max(top,VIEW.h-(phone?164:110));
+  let x=clamp(screen.x,30,VIEW.w-30),y=clamp(screen.y,top,bottom);
+  for(const other of placed)if(Math.hypot(other.x-x,other.y-y)<52){x=clamp(other.x+54,30,VIEW.w-30);if(Math.hypot(other.x-x,other.y-y)<52)y=clamp(other.y+54,top,bottom);}
   placed.push({x,y});
-  ctx.fillStyle='#0e2332ed';ctx.strokeStyle=g.boss?'#ffc38a':'#8cdde3';ctx.lineWidth=1.5;
-  ctx.beginPath();ctx.roundRect(x-72,y-22,144,44,7);ctx.fill();ctx.stroke();
-  ctx.fillStyle='#b9e9ef';ctx.font='bold 8px system-ui';ctx.textAlign='center';ctx.fillText(forecast.label,x,y-8);
-  ctx.font='bold 11px system-ui';ctx.fillStyle='#f3fcfa';ctx.fillText((g.ground?'Земля '+g.ground:'')+(g.ground&&g.air?' · ':'')+(g.air?'Воздух '+g.air:'')+(g.boss?' ★':''),x,y+9);
-  const dx=screen.x-x,dy=screen.y-y,angle=Math.atan2(dy,dx);
-  ctx.save();ctx.translate(x+Math.cos(angle)*72,y+Math.sin(angle)*23);ctx.rotate(angle);ctx.fillStyle='#9ce4e8';ctx.beginPath();ctx.moveTo(7,0);ctx.lineTo(-2,-4);ctx.lineTo(-2,4);ctx.closePath();ctx.fill();ctx.restore();
+  let button=[...layer.children].find(el=>el.dataset.entry===key);
+  if(!button){button=document.createElement('button');button.type='button';button.className='attack-marker';button.dataset.entry=key;button.setAttribute('aria-haspopup','dialog');button.setAttribute('aria-controls','entryForecastDialog');button.innerHTML='<span aria-hidden="true"></span>';button.addEventListener('click',()=>showEntryForecast(key));layer.append(button);}
+  const clock=attackForecastClock(g.items);
+  button.style.left=x+'px';button.style.top=y+'px';button.style.setProperty('--remaining',(360*clock.progress).toFixed(2)+'deg');
+  button.classList.toggle('boss-warning',g.items.some(item=>item.type==='boss'));
+  button.classList.toggle('waiting',clock.waiting);
+  button.firstElementChild.textContent=state.difficulty>0?'›':String(state.wave+1).padStart(2,'0');
+  button.setAttribute('aria-label',forecast.label+'. '+ROUTES[g.route].name+'. '+clock.label+'. Нажми, чтобы узнать состав.');
  }
- ctx.restore();
+}
+function forecastItems(forecast=nextAttackForecast()){
+ return state.difficulty>0&&!state.wave?forecast.items.filter(q=>q.group===forecast.items[0]?.group):forecast.items;
+}
+function attackForecastClock(items){
+ if(!state.wave)return {progress:1,waiting:false,label:'Запуск по команде'};
+ if(state.difficulty>0){
+  const end=Math.max(...items.map(item=>item.spawnAt)),plan=wavePlan(1),first=plan.find(item=>item.group===items[0]?.group);
+  const start=(state.waveClock?.openedAt||0)+.3+(first?.spawnOffset||0),left=Math.max(0,end-state.time);
+  return {progress:clamp(left/Math.max(.001,end-start),0,1),waiting:false,label:'Выход отряда: '+Math.ceil(left)+' с'};
+ }
+ const clock=state.waveClock;if(!clock)return {progress:1,waiting:false,label:'Подготовка волны'};
+ const deadline=clock.dueAt??clock.bonusDeadline,left=Math.max(0,deadline-state.time),waiting=left===0&&state.waves.length>=MAX_ACTIVE_WAVES;
+ return {progress:clamp(left/Math.max(.001,deadline-clock.openedAt),0,1),waiting,label:waiting?'Ожидает свободное место среди двух волн':'До автозапуска: '+Math.ceil(left)+' с'};
+}
+function showEntryForecast(key){
+ const forecast=nextAttackForecast(),items=forecastItems(forecast).filter(item=>ROUTES[item.route].cells[0].join(',')===key);
+ if(!items.length||anyDialogOpen()||battleResultPending())return;
+ const types=[...new Set(items.map(item=>item.type))],routes=[...new Set(items.map(item=>ROUTES[item.route].name))],air=items.filter(isAirUnit).length;
+ $('entryForecastTitle').textContent=forecast.label;
+ $('entryForecastRoutes').textContent=routes.join(' · ');
+ $('entryForecastSummary').textContent=items.length+' врагов · земля '+(items.length-air)+' · воздух '+air;
+ $('entryForecastClock').textContent=attackForecastClock(items).label;
+ $('entryForecastTypes').innerHTML=types.map(type=>{const group=items.filter(item=>item.type===type),elite=group.filter(item=>item.elite).length;return '<div class="entry-forecast-unit" style="--unit-color:'+ENEMIES[type].color+'">'+unitIcon(type)+'<div><strong>'+ENEMIES[type].name+'</strong><small>'+(isAirUnit(type)?'Воздух':'Земля')+(elite?' · элита '+elite:'')+'</small></div><b>×'+group.length+'</b></div>';}).join('');
+ showDialog('entryForecastDialog');
 }
 function validateCombatState(run) {
  const finite=(n,min=0,max=Number.MAX_SAFE_INTEGER)=>Number.isFinite(n)&&n>=min&&n<=max;

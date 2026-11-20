@@ -211,7 +211,11 @@ function completeWave(id){
  onBossWaveComplete(w);updateBest();notify('Волна '+id+' отбита! +'+bonus+' монет.');beep(660,.13,.04,'triangle');uiDirty=true;
  announce('Волна '+id+' отбита.');
 }
-function loseGame(){stopTowerRepair(false);state.bossShots=[];abilityAim=null;state.rewardQueue=[];state.orbitalStrikes=[];state.coreShield=0;state.lives=0;state.phase='lose';state.queue=[];state.shots=[];state.enemies=[];state.waves=[];updateBest();saveProgress();uiDirty=true;beep(95,.4,.06,'sawtooth');announce('Ядро потеряно. Игра окончена.');}
+function loseGame(){
+ if(['lose','win'].includes(state.phase))return;
+ stopTowerRepair(false);state.bossShots=[];abilityAim=null;state.rewardQueue=[];state.orbitalStrikes=[];state.coreShield=0;state.lives=0;state.phase='lose';state.queue=[];state.shots=[];state.enemies=[];state.waves=[];
+ beginBattleResult();updateBest();saveProgress();uiDirty=true;beep(95,.4,.06,'sawtooth');announce('Ядро потеряно. Игра окончена.');
+}
 function update(dt){
  if(paused||state.rewardQueue.length||state.phase==='lose'||state.phase==='win'||ART.loading)return;
  state.time+=dt;progressTick(dt);tickScorchFields(dt);supportTick(dt);if(state.rewardQueue.length){saveProgress();return;}state.launchCooldown=Math.max(0,state.launchCooldown-dt);updateWaveClock(false);
@@ -239,10 +243,13 @@ function update(dt){
   }
  }
  if(!state.waves.length)state.shots=[];
+ advanceDebris(dt);
+ updateWaveClock();updateVisuals(dt);checkCampaignVictory();if(progressSaveNeeded){progressSaveNeeded=false;saveProgress();}
+}
+function advanceDebris(dt){
  for(const p of particles){p.x+=p.vx*dt;p.y+=p.vy*dt;p.vx*=Math.pow(.09,dt);p.vy*=Math.pow(.09,dt);p.life-=dt;}particles=particles.filter(p=>p.life>0);
  for(const b of beams)b.life-=dt;beams=beams.filter(b=>b.life>0);
  for(const f of floaters){f.y-=19*dt;f.life-=dt;}floaters=floaters.filter(f=>f.life>0);
- updateWaveClock();updateVisuals(dt);checkCampaignVictory();if(progressSaveNeeded){progressSaveNeeded=false;saveProgress();}
 }
 function burst(x,y,color,count){count=Math.ceil(count*(fullEffects?1:.4));if(particles.length>600)return;for(let i=0;i<count;i++){const a=Math.random()*Math.PI*2,v=25+Math.random()*95;particles.push({x,y,vx:Math.cos(a)*v,vy:Math.sin(a)*v,life:.25+Math.random()*.45,color,size:1+Math.random()*2});}}
 function floatText(x,y,text,color){floaters.push({x,y,text,color,life:1.1});if(floaters.length>70)floaters.shift();}
@@ -513,7 +520,7 @@ const CAMERA={center:{x:WIDTH/2,y:HEIGHT/2},ready:false};
 const CAMERA_INPUT={points:new Map(),gesture:null,blocked:false,until:0};
 
 const UI={context:null,cell:null,anchor:null,modalBasePaused:true};
-const MODALS=['menuDialog','helpDialog','resetDialog','intelDialog','researchDialog','missionDetailsDialog','sectorMapDialog'];
+const MODALS=['menuDialog','helpDialog','resetDialog','intelDialog','researchDialog','missionDetailsDialog','sectorMapDialog','entryForecastDialog'];
 function worldToScreen(x,y){return VIEW.rotated?{x:VIEW.x+(HEIGHT-y)*VIEW.scale,y:VIEW.y+x*VIEW.scale}:{x:VIEW.x+x*VIEW.scale,y:VIEW.y+y*VIEW.scale};}
 function screenToWorld(x,y){
  const wx=VIEW.rotated?(y-VIEW.y)/VIEW.scale:(x-VIEW.x)/VIEW.scale,wy=VIEW.rotated?HEIGHT-(x-VIEW.x)/VIEW.scale:(y-VIEW.y)/VIEW.scale;
@@ -683,6 +690,7 @@ function openArsenal(){
  abilityAim=null;selectedId=null;selectedType=null;const r=$('arsenalBtn').getBoundingClientRect();showContext('build',null,{x:r.x+r.width/2,y:r.top});
 }
 function showDialog(id){
+ if(battleResultPending())return;
  closePerkTooltip();if($(id).open)return;if(!anyDialogOpen())UI.modalBasePaused=paused;
  closeContextPanel();setPause(true);$(id).showModal();uiDirty=true;
 }
@@ -728,13 +736,14 @@ function initShell(restored){
  $('startGameBtn').addEventListener('click',()=>openCommandCenter());$('splashMenuBtn').addEventListener('click',openMenu);$('menuBtn').addEventListener('click',openMenu);
  $('menuResumeBtn').addEventListener('click',resumeMenu);$('closeMenuBtn').addEventListener('click',()=>closeDialog('menuDialog'));
  $('intelBtn').addEventListener('click',()=>showDialog('intelDialog'));$('closeIntelBtn').addEventListener('click',()=>closeDialog('intelDialog'));
+ $('closeEntryForecast').addEventListener('click',()=>closeDialog('entryForecastDialog'));
  $('arsenalBtn').addEventListener('click',openArsenal);$('closeContextBtn').addEventListener('click',()=>closeContextPanel());$('cancelBuildBtn').addEventListener('click',()=>closeContextPanel());
  $('fullscreenBtn').addEventListener('click',async()=>{
   try{if(document.fullscreenElement)await document.exitFullscreen();else await document.documentElement.requestFullscreen();$('menuMessage').textContent='';fitCanvas();}
   catch(e){$('menuMessage').textContent='Полноэкранный режим недоступен в этом окне. Карта уже подстроена под размер браузера.';}
   uiDirty=true;
  });
- for(const id of ['menuDialog','intelDialog'])$(id).addEventListener('cancel',e=>{e.preventDefault();closeDialog(id);});
+ for(const id of ['menuDialog','intelDialog','entryForecastDialog'])$(id).addEventListener('cancel',e=>{e.preventDefault();closeDialog(id);});
  document.addEventListener('pointerdown',e=>{
   if(!UI.context||e.target===canvas||$('contextPanel').contains(e.target)||e.target.closest?.('#arsenalBtn'))return;
   closeContextPanel();
@@ -935,6 +944,7 @@ function onEnemyLeak(){state.enemiesLeaked++;uiDirty=true;}
 function checkCampaignVictory(){
  if(state.mode!=='campaign'||state.campaignWon||state.phase==='lose'||state.lives<=0||state.wave!==state.goalWaves||state.completed!==state.goalWaves||state.waves.length||state.queue.length||state.enemies.some(e=>e.hp>0)||!state.finalBossKilled)return false;
  stopTowerRepair(false);state.bossShots=[];state.campaignWon=true;state.phase='win';paused=true;abilityAim=null;state.shots=[];state.orbitalStrikes=[];state.enemies=[];
+ beginBattleResult();
  state.campaignLives=state.lives;state.campaignTime=state.time;state.campaignStars=state.enemiesLeaked===0?3:state.lives>=Math.ceil((state.maxLives||20)/2)?2:1;
  const mask=1<<state.difficulty,old=appData.profile.cleared[state.sectorId]||0;
  state.pointAwarded=!(old&mask);appData.profile.cleared[state.sectorId]=old|mask;
@@ -1145,7 +1155,7 @@ function frame(timestamp){
  if(!lastFrame)lastFrame=timestamp;const elapsed=Math.min((timestamp-lastFrame)/1000,.1);lastFrame=timestamp;now=timestamp/1000;
  // Ограниченный шаг сохраняет точность снарядов при ускорении и просадке FPS.
  const total=elapsed*speed,steps=Math.max(1,Math.ceil(total/(1/60))),dt=total/steps;
- for(let i=0;i<steps;i++)update(dt);if(sessionStarted&&state.time-lastSave>=3)saveProgress();render();
+ for(let i=0;i<steps;i++)update(dt);tickBattleResult(elapsed);if(sessionStarted&&state.time-lastSave>=3)saveProgress();render();
  if(uiDirty||timestamp-lastUI>200){refreshUI();lastUI=timestamp;}
  requestAnimationFrame(frame);
 }
@@ -1577,6 +1587,7 @@ function refreshCampaignUI(){
  if(won){$('boardOverlay').hidden=!sessionStarted||anyDialogOpen();$('boardOverlay').dataset.ended='false';$('pauseShortcut').hidden=true;$('overlayStars').innerHTML=campaignStarsArt(state.campaignStars);$('overlayTitle').textContent=m.id===28&&state.difficulty===0?'Кампания пройдена!':'Сектор защищён';$('overlayText').textContent=m.name+' · '+DIFFICULTIES[state.difficulty].name+' · '+state.lives+'/'+state.maxLives+' · '+timeLabel(state.time)+(state.pointAwarded?' · +1 очко технологий':' · очко уже получено');$('overlayAction').textContent='К карте кампании';}
  if(state.phase==='lose'){$('overlayAction').textContent='Повторить бой';if(state.defeatReason)$('overlayText').textContent=state.defeatReason;}
  if(ended)$('pauseBtn').disabled=true;$('campaignBadge').hidden=true;
+ const settling=battleResultPending();if(settling)$('boardOverlay').hidden=true;$('gameStage').classList.toggle('battle-settling',settling);
  $('researchBtn').innerHTML='Технологии<span>Просмотр · покупки между боями</span>';
  if($('researchDialog').open)refreshTechTree();refreshLabUI();
 }

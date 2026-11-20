@@ -396,7 +396,7 @@ dialog{color:var(--text);background:#102431;border:1px solid #638390;border-radi
 .command-heading{margin:20px auto 17px}.command-heading h1{font-size:27px;margin:0}.command-heading>span{display:none}.command-heading p:empty{display:none}
 .command-content{display:block}.planet-row{display:grid;grid-template-columns:155px minmax(0,1fr);align-items:center;gap:18px;padding:18px;border:1px solid #58778955;border-radius:13px;background:linear-gradient(110deg,#223b4b70,#10213080);margin-bottom:15px}
 .planet-info{display:flex;flex-direction:column;align-items:center;text-align:center;min-width:0}.planet-portrait{width:112px;height:112px;object-fit:contain;filter:drop-shadow(0 0 20px #7bbbd62a)}.planet-info small{font-size:8px;color:#7d9bad;letter-spacing:.15em}.planet-info h2{margin:6px 0;font-size:18px;font-weight:550;color:var(--sector-color)}.planet-info div>span{font-size:10px;color:#8faebf}
-.planet-sectors{min-width:0;overflow-x:auto;padding:10px 0;scrollbar-width:thin;scrollbar-color:#456877 transparent}.sector-chain{display:flex;position:relative;min-width:max-content;justify-content:space-between;gap:7px;padding:0 5px}.sector-chain:before{content:'';position:absolute;top:26px;left:30px;right:30px;height:2px;background:linear-gradient(90deg,var(--sector-color),#587c9655)}
+.planet-sectors{min-width:0;overflow-x:auto;padding:10px 0;scrollbar-width:thin;scrollbar-color:#456877 transparent}.sector-chain{display:flex;position:relative;min-width:max-content;justify-content:space-between;gap:7px;padding:0 5px}.sector-chain:before{content:'';position:absolute;top:34px;left:30px;right:30px;height:2px;background:linear-gradient(90deg,var(--sector-color),#587c9655)}
 .sector-node{min-width:77px;max-width:123px;flex:1;min-height:124px;padding:5px 3px;border-radius:9px;gap:8px;justify-content:flex-start}.sector-orbit-node{position:relative;z-index:1;display:grid;place-items:center;width:40px;height:40px;border:1px solid #6591a5;background:#102532;border-radius:50%;font:12px monospace;color:#aec6d5;box-shadow:0 0 0 6px #0d2430}.sector-node.cleared .sector-orbit-node{background:#416252;border-color:#bdde97;color:#efffce}.sector-node.selected .sector-orbit-node{border:2px solid var(--sector-color);box-shadow:0 0 0 5px #19303e,0 0 18px #a2d9dd33;color:#fff}.sector-node strong{max-width:115px;font-size:10px;min-height:25px}.sector-node.locked{opacity:.4}.sector-star-summary{display:block;margin:0;color:#f3d88a;font-size:14px;letter-spacing:2px;white-space:nowrap;line-height:1.3}
 #missionCard{position:fixed;z-index:5;left:clamp(14px,3vw,52px);right:clamp(14px,3vw,52px);bottom:14px;top:auto;max-width:1540px;margin:auto;display:grid;grid-template-columns:minmax(220px,1fr) minmax(330px,1fr);gap:22px;padding:15px 20px;border-top:2px solid var(--sector-color);background:linear-gradient(130deg,#1d3d50f7,#102431fa);box-shadow:0 -9px 38px #0007;backdrop-filter:blur(18px)}
 .mission-overview{display:flex;align-items:center;gap:17px;min-width:0}#sectorPreview{width:150px;flex:none;display:block;padding:0;position:relative;overflow:hidden;cursor:zoom-in;border-radius:8px;background:#10232d;border:1px solid #83c5d45c}#sectorPreview canvas{margin:0;display:block;width:100%}.sector-preview-open{display:block;text-align:center;padding:5px 2px;color:#c9f6ee;font-size:9px;background:#10232de8}#sectorPreview:focus-visible{outline:2px solid #d4fa7a;outline-offset:3px}#sectorMapDialog{width:auto;max-width:calc(100vw - 24px);max-height:calc(100dvh - 24px);padding:16px;overflow:hidden}#sectorMapDialog .menu-header{margin:0 0 10px;gap:20px}#sectorMapTitle{font-size:clamp(15px,2vw,22px);margin:0}#sectorMapSubtitle{margin:5px 0 0;color:#9ec1ca;font-size:11px}.sector-map-view{display:grid;place-items:center;overflow:hidden;border:1px solid #85b7c54a;border-radius:9px}#sectorLargeCanvas{display:block;max-width:100%;margin:0}.sector-map-legend{display:flex;justify-content:center;gap:16px;flex-wrap:wrap;margin:12px 0 0;font-size:10px;color:#c6dee0}.sector-map-legend>span{display:flex;gap:6px;align-items:center}.sector-map-legend i{display:inline-block;width:18px;height:3px;background:#b9b39a}.sector-map-legend .map-air{background:repeating-linear-gradient(90deg,#abf3ff 0 5px,transparent 5px 8px)}.sector-map-legend .map-pad{width:9px;height:9px;border:1px solid #c3ead6;background:#254553}.sector-map-legend .map-core{width:9px;height:9px;border-radius:50%;background:#a4ffdf}.mission-identity{min-width:0}#sectorKicker{font-size:8px}#sectorName{font-size:23px;margin:7px 0 10px}#sectorFacts{margin:0;justify-content:flex-start;gap:14px;align-items:center}#sectorFacts b{font-size:14px;margin:0 0 3px}#sectorFacts span{font-size:9px}#sectorFacts .sector-star-summary{font-size:13px}
@@ -439,3 +439,30 @@ dialog{color:var(--text);background:#102431;border:1px solid #638390;border-radi
 #testLabDock button{min-height:30px;font-size:10px;padding:6px 10px}#testLabDock[hidden],#testLabBadge[hidden]{display:none}.test-lab-active #campaignScreen{padding-bottom:220px}
 body[data-screen="campaign"] #testLabDock{position:relative;left:auto;bottom:auto;max-width:100%;margin:12px 0;display:inline-flex}
 @media(max-width:700px){#gameVersion{bottom:10px;right:12px}#testLabBadge{top:175px;right:8px;font-size:8px}#testLabDock{padding:7px;gap:5px}#testLabDock button{font-size:9px;padding:5px 7px}}
+
+/* Keep the selection frame fixed; lower only the sector chain content. */
+.sector-chain .sector-node>*{transform:translateY(8px)}
+/* Compact entry clocks. The sector shrinks clockwise from twelve o'clock. */
+.attack-markers{position:absolute;inset:0;pointer-events:none}
+.attack-marker{--marker-color:#a4e4ec;position:absolute;transform:translate(-50%,-50%);width:44px;height:44px;min-height:44px;padding:0;border:1px solid var(--marker-color);border-radius:50%;display:grid;place-items:center;background:#0a202fee;color:#effffe;pointer-events:auto;touch-action:manipulation;cursor:pointer;isolation:isolate;box-shadow:0 3px 12px #0007,inset 0 0 0 3px #132f3b}
+.attack-marker:before{content:'';position:absolute;inset:4px;z-index:-1;border-radius:50%;background:conic-gradient(from 0deg,var(--marker-color) 0deg var(--remaining,360deg),transparent var(--remaining,360deg) 360deg);opacity:.4}
+.attack-marker>span{font:600 12px ui-monospace,monospace;text-shadow:0 1px 3px #07121e,0 0 5px #07121e}
+.attack-marker:hover{background:#203d4cef;box-shadow:0 0 0 3px #a4e4ec25}
+.attack-marker:focus-visible{outline:2px solid #d4fa7a;outline-offset:4px}
+.attack-marker.boss-warning{--marker-color:#ffc38a}
+.attack-marker.waiting:before{opacity:.15}
+#entryForecastDialog{max-width:400px}
+#entryForecastDialog .menu-header{gap:15px}
+#entryForecastDialog h2{font-size:19px}
+#entryForecastRoutes{margin:0 0 12px;color:#83adbf;font-size:10px;letter-spacing:.04em}
+#entryForecastSummary{display:block;color:#e2f4f8;font-size:13px}
+#entryForecastClock{color:#d4fa7a;margin:6px 0 18px}
+#entryForecastTypes{display:grid;gap:7px}
+.entry-forecast-unit{display:flex;align-items:center;gap:12px;padding:10px 12px;background:#193441;border:1px solid #3e64744f;border-radius:8px;color:var(--unit-color)}
+.entry-forecast-unit>svg{width:25px;height:25px;flex:none}
+.entry-forecast-unit>div{display:grid;gap:3px;flex:1}
+.entry-forecast-unit strong{color:#e1f2f6;font-size:12px;font-weight:550}
+.entry-forecast-unit small{color:#91b0bd;font-size:10px}
+.entry-forecast-unit>b{color:var(--unit-color);font:600 16px ui-monospace,monospace}
+#entryForecastDialog .entry-forecast-note{margin:17px 0 0;font-size:10px;color:#8ba7b6}
+.battle-settling #gameHud button{pointer-events:none}
