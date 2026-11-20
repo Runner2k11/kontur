@@ -5,6 +5,7 @@ import re
 import struct
 import unittest
 import sys
+import subprocess
 
 ROOT = Path(__file__).resolve().parent.parent
 OUT = ROOT / 'dist'
@@ -12,6 +13,16 @@ sys.path.insert(0,str(ROOT/'scripts'))
 from build import version_name
 
 class OfflineBundle(unittest.TestCase):
+    def test_battle_ui_behavior(self):
+        script=ROOT/'tests/battle-ui.test.cjs'
+        result=subprocess.run(['node',str(script)],capture_output=True,text=True,encoding='utf-8',timeout=30)
+        self.assertEqual(result.returncode,0,result.stdout+result.stderr)
+
+    def test_commander_behavior(self):
+        script=ROOT/'tests/commander.test.cjs'
+        result=subprocess.run(['node',str(script)],capture_output=True,text=True,encoding='utf-8',timeout=30)
+        self.assertEqual(result.returncode,0,result.stdout+result.stderr)
+
     def test_test_build_number_survives_stable_promotion(self):
         settings={'major':1,'build':30,'testBuild':1}
         self.assertEqual(version_name(settings),'1.030.01')
