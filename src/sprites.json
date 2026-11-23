@@ -160,5 +160,114 @@
     "h": 126,
     "px": 0.5,
     "py": 0.5
+  },
+  "frontierAtlasUrl": "assets/frontierAtlas-07628cbbb6647aa2.png",
+  "base_garrison": {
+    "x": 0,
+    "y": 0,
+    "w": 362,
+    "h": 362,
+    "px": 0.5,
+    "py": 0.5,
+    "atlas": "frontier"
+  },
+  "soldier": {
+    "x": 362,
+    "y": 7,
+    "w": 362,
+    "h": 355,
+    "px": 0.5,
+    "py": 0.5,
+    "atlas": "frontier"
+  },
+  "soldier_sentinel": {
+    "x": 724,
+    "y": 8,
+    "w": 362,
+    "h": 354,
+    "px": 0.5,
+    "py": 0.5,
+    "atlas": "frontier"
+  },
+  "soldier_rangers": {
+    "x": 1086,
+    "y": 13,
+    "w": 362,
+    "h": 349,
+    "px": 0.5,
+    "py": 0.5,
+    "atlas": "frontier"
+  },
+  "enemy_spider": {
+    "x": 0,
+    "y": 362,
+    "w": 362,
+    "h": 362,
+    "px": 0.5,
+    "py": 0.5,
+    "atlas": "frontier"
+  },
+  "enemy_buggy": {
+    "x": 362,
+    "y": 362,
+    "w": 362,
+    "h": 362,
+    "px": 0.5,
+    "py": 0.5,
+    "atlas": "frontier"
+  },
+  "enemy_tank": {
+    "x": 724,
+    "y": 362,
+    "w": 362,
+    "h": 362,
+    "px": 0.5,
+    "py": 0.5,
+    "atlas": "frontier"
+  },
+  "enemy_hover": {
+    "x": 1086,
+    "y": 362,
+    "w": 362,
+    "h": 362,
+    "px": 0.5,
+    "py": 0.5,
+    "atlas": "frontier"
+  },
+  "enemy_walker": {
+    "x": 0,
+    "y": 724,
+    "w": 362,
+    "h": 362,
+    "px": 0.5,
+    "py": 0.5,
+    "atlas": "frontier"
+  },
+  "enemy_shieldbot": {
+    "x": 362,
+    "y": 724,
+    "w": 362,
+    "h": 362,
+    "px": 0.5,
+    "py": 0.5,
+    "atlas": "frontier"
+  },
+  "enemy_repairbot": {
+    "x": 724,
+    "y": 724,
+    "w": 362,
+    "h": 362,
+    "px": 0.5,
+    "py": 0.5,
+    "atlas": "frontier"
+  },
+  "enemy_transport": {
+    "x": 1086,
+    "y": 724,
+    "w": 361,
+    "h": 362,
+    "px": 0.5,
+    "py": 0.5,
+    "atlas": "frontier"
   }
 }

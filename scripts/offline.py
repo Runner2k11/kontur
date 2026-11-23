@@ -22,6 +22,8 @@ def package(destination):
         mime = 'image/x-icon' if path.suffix == '.ico' else 'image/png'
         return f'data:{mime};base64,' + base64.b64encode(path.read_bytes()).decode('ascii')
 
+    if metadata.get('sprites', {}).get('frontierAtlasUrl'):
+        metadata['sprites']['frontierAtlasUrl'] = data_url(metadata['sprites']['frontierAtlasUrl'])
     for key, value in metadata.items():
         if key != 'sprites':
             metadata[key] = data_url(value)
