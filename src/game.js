@@ -32,7 +32,7 @@ const TOWERS={
  frost:{name:'Крио',cost:90,damage:7,rate:.8,range:130,color:'#8cbaff',speed:370,slow:.48,desc:'Замедляет наземные и воздушные цели на 52% на 1.8 секунды. Поддерживает соседние орудия.',special:'Замедление 52%'},
  rail:{name:'Рельса',cost:100,damage:49,rate:1.8,range:240,color:'#c6a1ff',speed:1000,pierce:true,desc:'Атакует землю и воздух, игнорирует броню. Эффективна против броневиков и тяжёлых штурмовиков.',special:'Игнорирует броню'}
 };
-TOWERS.garrison={name:'Гарнизон',cost:75,damage:6,rate:.9,range:150,color:'#9bf1cf',speed:500,desc:'Три робота удерживают наземных врагов у флага. Каждый блокирует одну цель. Погибшие возвращаются через 9 с.',special:'Три бойца · точка сбора'};
+TOWERS.garrison={name:'Гарнизон',cost:75,damage:6,rate:.9,range:150,color:'#9bf1cf',speed:500,desc:'Три робота выходят из казармы и идут к флагу. Каждый задерживает одну цель; свободные бойцы помогают против общей цели. Погибшие восстанавливаются за 9 с и снова идут на позицию.',special:'Три бойца · точка сбора'};
 const ENEMIES={
  scout:{name:'Разведчики',hp:46,speed:65,reward:9,armor:0,damage:1,color:'#f4be84',radius:9,symbol:'◇'},
  runner:{name:'Бегуны',hp:32,speed:112,reward:9,armor:0,damage:1,color:'#f08b9c',radius:8,symbol:'»'},
@@ -285,8 +285,8 @@ function loadArt(){
    const timer=setTimeout(()=>done(null),30000);
    try{image=new Image();image.onload=()=>done(image);image.onerror=()=>done(null);image.src=url;}catch(e){done(null);}
   });
-  const [terrain,atlas,logo,uiAtlas,statusAtlas,airAtlas,planetAtlas,planetTerrainAtlas,campaignBackdrop,startBackdrop,battleBackdrop,frontierAtlas]=await Promise.all([load(data.terrain),load(data.atlas),load(data.logo),load(data.uiAtlas),load(data.statusAtlas),load(data.airAtlas),load(data.planetAtlas),load(data.planetTerrainAtlas),load(data.campaignBackdrop),load(data.startBackdrop),load(data.battleBackdrop),load(data.sprites.frontierAtlasUrl)]);
-  Object.assign(ART,{frontierAtlas,terrain,atlas,logo,uiAtlas,statusAtlas,airAtlas,planetAtlas,planetTerrainAtlas,campaignBackdrop,startBackdrop,battleBackdrop,uiAtlasUrl:data.uiAtlas,ready:!!(terrain&&atlas)});
+  const [terrain,atlas,logo,uiAtlas,statusAtlas,airAtlas,planetAtlas,planetTerrainAtlas,campaignBackdrop,startBackdrop,battleBackdrop,frontierAtlas,garrisonAnimation]=await Promise.all([load(data.terrain),load(data.atlas),load(data.logo),load(data.uiAtlas),load(data.statusAtlas),load(data.airAtlas),load(data.planetAtlas),load(data.planetTerrainAtlas),load(data.campaignBackdrop),load(data.startBackdrop),load(data.battleBackdrop),load(data.sprites.frontierAtlasUrl),load(data.sprites.garrisonAnimationUrl)]);
+  Object.assign(ART,{garrisonAnimation,frontierAtlas,terrain,atlas,logo,uiAtlas,statusAtlas,airAtlas,planetAtlas,planetTerrainAtlas,campaignBackdrop,startBackdrop,battleBackdrop,uiAtlasUrl:data.uiAtlas,ready:!!(terrain&&atlas)});
   // CSS rejects very large data URL tokens. Icons only need small atlases.
   const cssAtlas=(image,width)=>{const c=document.createElement('canvas');c.width=Math.min(width,image.width);c.height=Math.round(image.height*c.width/image.width);c.getContext('2d').drawImage(image,0,0,c.width,c.height);return 'url("'+c.toDataURL('image/png')+'")';};
   if(statusAtlas)document.documentElement.style.setProperty('--status-atlas',cssAtlas(statusAtlas,384));

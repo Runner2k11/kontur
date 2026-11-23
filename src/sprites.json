@@ -269,5 +269,222 @@
     "px": 0.5,
     "py": 0.5,
     "atlas": "frontier"
+  },
+  "garrisonAnimationUrl": "assets/garrisonAnimation-0fdd871536134a9b.png",
+  "soldier_motion_0": {
+    "atlas": "troops",
+    "x": 0,
+    "y": 0,
+    "w": 256,
+    "h": 256,
+    "px": 0.5,
+    "py": 0.88
+  },
+  "soldier_motion_1": {
+    "atlas": "troops",
+    "x": 256,
+    "y": 0,
+    "w": 256,
+    "h": 256,
+    "px": 0.5,
+    "py": 0.88
+  },
+  "soldier_motion_2": {
+    "atlas": "troops",
+    "x": 512,
+    "y": 0,
+    "w": 256,
+    "h": 256,
+    "px": 0.5,
+    "py": 0.88
+  },
+  "soldier_motion_3": {
+    "atlas": "troops",
+    "x": 768,
+    "y": 0,
+    "w": 256,
+    "h": 256,
+    "px": 0.5,
+    "py": 0.88
+  },
+  "soldier_motion_4": {
+    "atlas": "troops",
+    "x": 1024,
+    "y": 0,
+    "w": 256,
+    "h": 256,
+    "px": 0.5,
+    "py": 0.88
+  },
+  "soldier_motion_5": {
+    "atlas": "troops",
+    "x": 1280,
+    "y": 0,
+    "w": 256,
+    "h": 256,
+    "px": 0.5,
+    "py": 0.88
+  },
+  "soldier_motion_6": {
+    "atlas": "troops",
+    "x": 1536,
+    "y": 0,
+    "w": 256,
+    "h": 256,
+    "px": 0.5,
+    "py": 0.88
+  },
+  "soldier_motion_7": {
+    "atlas": "troops",
+    "x": 1792,
+    "y": 0,
+    "w": 256,
+    "h": 256,
+    "px": 0.5,
+    "py": 0.88
+  },
+  "soldier_sentinel_motion_0": {
+    "atlas": "troops",
+    "x": 0,
+    "y": 256,
+    "w": 256,
+    "h": 256,
+    "px": 0.5,
+    "py": 0.88
+  },
+  "soldier_sentinel_motion_1": {
+    "atlas": "troops",
+    "x": 256,
+    "y": 256,
+    "w": 256,
+    "h": 256,
+    "px": 0.5,
+    "py": 0.88
+  },
+  "soldier_sentinel_motion_2": {
+    "atlas": "troops",
+    "x": 512,
+    "y": 256,
+    "w": 256,
+    "h": 256,
+    "px": 0.5,
+    "py": 0.88
+  },
+  "soldier_sentinel_motion_3": {
+    "atlas": "troops",
+    "x": 768,
+    "y": 256,
+    "w": 256,
+    "h": 256,
+    "px": 0.5,
+    "py": 0.88
+  },
+  "soldier_sentinel_motion_4": {
+    "atlas": "troops",
+    "x": 1024,
+    "y": 256,
+    "w": 256,
+    "h": 256,
+    "px": 0.5,
+    "py": 0.88
+  },
+  "soldier_sentinel_motion_5": {
+    "atlas": "troops",
+    "x": 1280,
+    "y": 256,
+    "w": 256,
+    "h": 256,
+    "px": 0.5,
+    "py": 0.88
+  },
+  "soldier_sentinel_motion_6": {
+    "atlas": "troops",
+    "x": 1536,
+    "y": 256,
+    "w": 256,
+    "h": 256,
+    "px": 0.5,
+    "py": 0.88
+  },
+  "soldier_sentinel_motion_7": {
+    "atlas": "troops",
+    "x": 1792,
+    "y": 256,
+    "w": 256,
+    "h": 256,
+    "px": 0.5,
+    "py": 0.88
+  },
+  "soldier_rangers_motion_0": {
+    "atlas": "troops",
+    "x": 0,
+    "y": 512,
+    "w": 256,
+    "h": 256,
+    "px": 0.5,
+    "py": 0.88
+  },
+  "soldier_rangers_motion_1": {
+    "atlas": "troops",
+    "x": 256,
+    "y": 512,
+    "w": 256,
+    "h": 256,
+    "px": 0.5,
+    "py": 0.88
+  },
+  "soldier_rangers_motion_2": {
+    "atlas": "troops",
+    "x": 512,
+    "y": 512,
+    "w": 256,
+    "h": 256,
+    "px": 0.5,
+    "py": 0.88
+  },
+  "soldier_rangers_motion_3": {
+    "atlas": "troops",
+    "x": 768,
+    "y": 512,
+    "w": 256,
+    "h": 256,
+    "px": 0.5,
+    "py": 0.88
+  },
+  "soldier_rangers_motion_4": {
+    "atlas": "troops",
+    "x": 1024,
+    "y": 512,
+    "w": 256,
+    "h": 256,
+    "px": 0.5,
+    "py": 0.88
+  },
+  "soldier_rangers_motion_5": {
+    "atlas": "troops",
+    "x": 1280,
+    "y": 512,
+    "w": 256,
+    "h": 256,
+    "px": 0.5,
+    "py": 0.88
+  },
+  "soldier_rangers_motion_6": {
+    "atlas": "troops",
+    "x": 1536,
+    "y": 512,
+    "w": 256,
+    "h": 256,
+    "px": 0.5,
+    "py": 0.88
+  },
+  "soldier_rangers_motion_7": {
+    "atlas": "troops",
+    "x": 1792,
+    "y": 512,
+    "w": 256,
+    "h": 256,
+    "px": 0.5,
+    "py": 0.88
   }
 }

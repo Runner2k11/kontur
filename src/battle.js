@@ -450,7 +450,7 @@ const FRONTIER_UPGRADES={pulse:[80,130,210],garrison:[90,140,230],rail:[120,180,
 const FRONTIER_SKILLS={pulse:['Сервоприводы','Урон +15%, скорость огня +8%'],rail:['Сверхпроводник','Урон +22%'],cannon:['Термобарический заряд','Урон +16%, радиус +10%'],frost:['Криоконтур','Длительность +35%, дальность +10%'],garrison:['Боевой комплект','Прочность +30%, урон +20%']};
 const FRONTIER_MAP_NAMES={serpentine:'Серпантин',funnel:'Воронка',island:'Центральный остров',multiline:'Мосты и фланги'};
 let rallyTargetId=null;
-function spriteAtlas(s){return s.atlas==='frontier'?ART.frontierAtlas:s.atlas==='air'?ART.airAtlas:ART.atlas;}
+function spriteAtlas(s){return s.atlas==='troops'?ART.garrisonAnimation:s.atlas==='frontier'?ART.frontierAtlas:s.atlas==='air'?ART.airAtlas:ART.atlas;}
 function initFrontierRevision(){
  Object.defineProperty(TOWERS.rail,'cost',{get(){return state.mode==='campaign'?100:180;},enumerable:true,configurable:true});
  const extra={
@@ -630,26 +630,62 @@ function setGarrisonRally(p){
  t.rally=best;rallyTargetId=null;saveProgress();uiDirty=true;ring(best.x,best.y,'#a4f6d5',28,.6);
 }
 function garrisonSoldierStats(t){const s=towerStats(t),hp=80*Math.pow(1.85,t.level-1)*(t.branch==='sentinel'?2:t.branch==='rangers'?.8:1)*(t.skillRank?1.3:1);return {hp,damage:s.damage*(t.branch==='rangers'?1.6:1)*(t.skillRank?1.2:1),rate:s.rate,range:t.branch==='rangers'?CELL*2.3:28};}
+// Infantry uses world units per second: no distance-dependent interpolation.
+const GARRISON_WALK_SPEED=52;
+const GARRISON_CONTACT_RANGE=24;
+function moveGarrisonSoldier(s,x,y,dt){
+ const dx=x-s.x,dy=y-s.y,distance=Math.hypot(dx,dy),step=Math.min(distance,GARRISON_WALK_SPEED*dt);
+ s.walking=step>.05;
+ if(step>0){s.x+=dx/distance*step;s.y+=dy/distance*step;s.walkDistance=(s.walkDistance||0)+step;if(Math.abs(dx)>.5)s.facing=dx<0?-1:1;}
+ return step;
+}
+function retireGarrisonSoldier(s){s.hp=0;s.respawnAt=state.time+9;s.enemyId=null;s.walking=false;s.fireUntil=0;burst(s.x,s.y,'#9bf1cf',8);}
 function tickGarrisons(dt){
  for(const e of state.enemies)delete e.blockedBy;
+ const assignments=new Map(),contacts=new Map(),shots=[];
  for(const t of state.towers)if(t.type==='garrison'){
-  const r=garrisonRally(t),stats=garrisonSoldierStats(t);t.soldiers??=Array.from({length:3},()=>({hp:stats.hp,maxHp:stats.hp,respawnAt:0,cooldown:0,x:t.x,y:t.y,enemyId:null}));
+  const r=garrisonRally(t),stats=garrisonSoldierStats(t);
+  t.soldiers??=Array.from({length:3},(_,i)=>({hp:stats.hp,maxHp:stats.hp,respawnAt:0,readyAt:state.time+i*.25,cooldown:.15,x:t.x,y:t.y+8,enemyId:null,walkDistance:0,walking:false,facing:r.x<t.x?-1:1}));
   for(let i=0;i<t.soldiers.length;i++){
-   const s=t.soldiers[i];if(s.hp<=0){if(state.time<s.respawnAt)continue;s.hp=stats.hp;s.maxHp=stats.hp;s.x=t.x;s.y=t.y;}
+   const s=t.soldiers[i];s.walking=false;
+   if(s.hp<=0){if(state.time<s.respawnAt)continue;Object.assign(s,{hp:stats.hp,maxHp:stats.hp,x:t.x,y:t.y+8,readyAt:state.time,cooldown:.15,enemyId:null,walkDistance:0,fireUntil:0});}
    if(s.maxHp!==stats.hp){s.hp=Math.min(stats.hp,s.hp+Math.max(0,stats.hp-s.maxHp));s.maxHp=stats.hp;}
-   if(t.disabled)continue;
-   const claimed=id=>state.enemies.find(e=>e.id===id)?.blockedBy;
-   let enemy=state.enemies.find(e=>e.id===s.enemyId&&e.hp>0&&!isAirUnit(e)&&e.type!=='boss'&&!e.blockedBy&&Math.hypot(e.x-r.x,e.y-r.y)<=CELL*.8);
-   if(!enemy)enemy=state.enemies.filter(e=>e.hp>0&&!isAirUnit(e)&&e.type!=='boss'&&!e.blockedBy&&Math.hypot(e.x-r.x,e.y-r.y)<=CELL*.65).sort((a,b)=>remainingDistance(a)-remainingDistance(b))[0];
-   s.enemyId=enemy?.id??null;
-   const targetX=enemy?enemy.x-10:r.x+[-12,0,12][i],targetY=enemy?enemy.y+[-10,10,0][i]:r.y+[-9,9,-9][i];
-   const step=Math.min(1,dt*7);s.x+=(targetX-s.x)*step;s.y+=(targetY-s.y)*step;
-   if(enemy){enemy.blockedBy=t.id;const attack=enemy.type==='walker'||enemy.type==='tank'?24:enemy.type==='armor'?17:7;s.hp-=attack*dt;if(s.hp<=0){s.hp=0;s.respawnAt=state.time+9;s.enemyId=null;delete enemy.blockedBy;burst(s.x,s.y,'#9bf1cf',8);continue;}}
-   else s.hp=Math.min(stats.hp,s.hp+6*dt);
+   if(t.disabled||state.time<(s.readyAt??0))continue;
    s.cooldown=Math.max(-.5,s.cooldown-dt);
-   const target=enemy||((t.branch==='rangers')?state.enemies.find(e=>e.hp>0&&!isAirUnit(e)&&Math.hypot(e.x-s.x,e.y-s.y)<stats.range):null);
-   if(target&&s.cooldown<=0){damageEnemy(target,stats.damage,false);s.cooldown=stats.rate;beams.push({x:s.x,y:s.y,tx:target.x,ty:target.y,color:'#9bf1cf',life:.07,maxLife:.07});}
+   const candidates=state.enemies.filter(e=>e.hp>0&&!isAirUnit(e)&&Math.hypot(e.x-r.x,e.y-r.y)<=(t.branch==='rangers'?stats.range+16:CELL*.95)).sort((a,b)=>remainingDistance(a)-remainingDistance(b)||a.id-b.id);
+   // Cover separate threats when possible. Extra soldiers join the same enemy;
+   // selecting a target does not itself block, damage or claim it exclusively.
+   const previous=candidates.find(e=>e.id===s.enemyId),free=candidates.filter(e=>!assignments.get(e.id));
+   const enemy=(previous&&!assignments.get(previous.id)?previous:null)||free[0]||previous||candidates[0];
+   s.enemyId=enemy?.id??null;
+   if(enemy)assignments.set(enemy.id,(assignments.get(enemy.id)||0)+1);
+   const standX=r.x+[-15,0,15][i],standY=r.y+[-11,12,-11][i];
+   const ranged=t.branch==='rangers';
+   const x=enemy&&!ranged?enemy.x+[-17,17,0][i]:standX,y=enemy&&!ranged?enemy.y+[-10,-10,19][i]:standY;
+   moveGarrisonSoldier(s,x,y,dt);
+   if(!enemy){s.hp=Math.min(stats.hp,s.hp+6*dt);continue;}
+   const distance=Math.hypot(enemy.x-s.x,enemy.y-s.y);
+   if(enemy.type!=='boss'&&distance<=GARRISON_CONTACT_RANGE){if(!contacts.has(enemy))contacts.set(enemy,[]);contacts.get(enemy).push({t,s,key:t.id+':'+i,distance});}
+   if(distance<=stats.range){s.aimAngle=Math.atan2(enemy.y-7-(s.y-14),enemy.x-s.x);if(Math.abs(enemy.x-s.x)>.5)s.facing=enemy.x<s.x?-1:1;shots.push({s,enemy,stats});}
   }
+ }
+ // A single enemy strikes a single defender per tick, even when surrounded.
+ // Keep its current defender until that soldier dies or leaves contact range.
+ for(const [enemy,defenders]of contacts){
+  if(enemy.hp<=0)continue;
+  defenders.sort((a,b)=>a.distance-b.distance||a.key.localeCompare(b.key));
+  const victim=defenders.find(d=>d.key===enemy.garrisonDefender)||defenders[0];
+  enemy.garrisonDefender=victim.key;enemy.blockedBy=victim.t.id;
+  const attack=enemy.type==='walker'||enemy.type==='tank'?24:enemy.type==='armor'?17:7;
+  if(enemy.stunUntil<=state.time||enemy.stunUntil===undefined)victim.s.hp-=attack*dt;
+  if(victim.s.hp<=0){retireGarrisonSoldier(victim.s);const next=defenders.find(d=>d.s.hp>0);if(next){enemy.garrisonDefender=next.key;enemy.blockedBy=next.t.id;}else{delete enemy.blockedBy;delete enemy.garrisonDefender;}}
+ }
+ for(const {s,enemy,stats}of shots){
+  if(s.hp<=0||enemy.hp<=0||s.cooldown>0)continue;
+  const angle=s.aimAngle||0,x=s.x+Math.cos(angle)*12,y=s.y-14+Math.sin(angle)*6;
+  damageEnemy(enemy,stats.damage,false);s.cooldown=stats.rate;s.fireUntil=state.time+.18;s.shotAngle=angle;
+  beams.push({x,y,tx:enemy.x,ty:enemy.y-7,color:'#baffdf',life:.14,maxLife:.14});
+  burst(x,y,'#ffe2a1',3);burst(enemy.x,enemy.y-7,'#c5ffdf',2);
  }
 }
 function drawGarrisonTower(t,ghost,g){
@@ -657,10 +693,31 @@ function drawGarrisonTower(t,ghost,g){
  if(selectedId===t.id||rallyTargetId===t.id){const r=garrisonRally(t);g.save();g.strokeStyle='#9bf1cf88';g.setLineDash([4,4]);g.beginPath();g.moveTo(t.x,t.y);g.lineTo(r.x,r.y);g.stroke();g.setLineDash([]);g.fillStyle='#b7ffe0';g.fillRect(r.x-1,r.y-14,2,24);g.beginPath();g.moveTo(r.x+1,r.y-14);g.lineTo(r.x+15,r.y-9);g.lineTo(r.x+1,r.y-4);g.fill();g.restore();}
 }
 function drawGarrisonUnits(g){
- for(const t of state.towers)if(t.type==='garrison')for(const s of t.soldiers||[]){if(s.hp<=0)continue;g.save();if(t.disabled)g.globalAlpha=.4;sprite(g,t.branch==='sentinel'?'soldier_sentinel':t.branch==='rangers'?'soldier_rangers':'soldier',s.x,s.y,22);if(s.hp<s.maxHp){g.fillStyle='#142d30';g.fillRect(s.x-10,s.y-18,20,3);g.fillStyle='#a2f6c9';g.fillRect(s.x-10,s.y-18,20*s.hp/s.maxHp,3);}g.restore();}
+ for(const t of state.towers)if(t.type==='garrison')for(const s of t.soldiers||[]){
+  if(s.hp<=0||state.time<(s.readyAt??0))continue;
+  const firing=(s.fireUntil||0)>state.time,base=t.branch==='sentinel'?'soldier_sentinel':t.branch==='rangers'?'soldier_rangers':'soldier';
+  const frame=s.walking?Math.floor((s.walkDistance||0)/6)%6:firing?6:7,key=base+'_motion_'+frame;
+  g.save();if(t.disabled)g.globalAlpha=.4;
+  g.fillStyle='#071c2455';g.beginPath();g.ellipse(s.x,s.y+1,10,4,0,0,Math.PI*2);g.fill();
+  g.save();g.translate(s.x,s.y);if(s.facing<0)g.scale(-1,1);
+  if(ART.garrisonAnimation&&ART.sprites[key])sprite(g,key,0,0,36);
+  else sprite(g,base,0,-10,22);
+  g.restore();
+  if(firing&&!t.disabled){
+   const angle=s.shotAngle||0,x=s.x+Math.cos(angle)*12,y=s.y-14+Math.sin(angle)*6,alpha=Math.min(1,(s.fireUntil-state.time)/.1);
+   g.save();g.translate(x,y);g.rotate(angle);g.globalAlpha*=alpha;g.fillStyle='#ffbf6655';g.beginPath();g.arc(0,0,7,0,Math.PI*2);g.fill();g.fillStyle='#ffe9b2';g.beginPath();g.moveTo(9,0);g.lineTo(2,-3);g.lineTo(0,-6);g.lineTo(-2,-2);g.lineTo(-5,0);g.lineTo(-1,2);g.lineTo(0,5);g.lineTo(3,2);g.closePath();g.fill();g.fillStyle='#fff';g.fillRect(-1,-1,4,2);g.restore();
+  }
+  if(s.hp<s.maxHp){g.fillStyle='#142d30';g.fillRect(s.x-10,s.y-33,20,3);g.fillStyle='#a2f6c9';g.fillRect(s.x-10,s.y-33,20*s.hp/s.maxHp,3);}
+  g.restore();
+ }
 }
 function validateGarrisons(run){
  const finite=(n,min,max)=>Number.isFinite(n)&&n>=min&&n<=max;
  for(const t of run.towers){if(t.skillRank!==undefined&&![0,1].includes(t.skillRank))return false;if(t.rally&&(!finite(t.rally.x,0,WIDTH)||!finite(t.rally.y,0,HEIGHT)||!Number.isInteger(t.rally.route)||!ROUTES[t.rally.route]||!finite(t.rally.distance,0,ROUTES[t.rally.route].length)))return false;if(t.soldiers&&(!Array.isArray(t.soldiers)||t.soldiers.length!==3||t.soldiers.some(s=>!finite(s.hp,0,s.maxHp)||!finite(s.maxHp,1,100000)||!finite(s.respawnAt,0,1e10)||!finite(s.cooldown,-1,5)||!finite(s.x,-100,WIDTH+100)||!finite(s.y,-100,HEIGHT+100))))return false;}
+ for(const t of run.towers)for(const soldier of t.soldiers||[]){
+  for(const key of ['readyAt','walkDistance','fireUntil'])if(soldier[key]!==undefined&&!finite(soldier[key],0,1e12))return false;
+  for(const key of ['aimAngle','shotAngle'])if(soldier[key]!==undefined&&!finite(soldier[key],-100,100))return false;
+  if(soldier.walking!==undefined&&typeof soldier.walking!=='boolean'||soldier.facing!==undefined&&![1,-1].includes(soldier.facing))return false;
+ }
  return true;
 }
