@@ -2,7 +2,7 @@ const {test}=require('node:test');
 const assert=require('node:assert/strict');
 const fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
 const code=fs.readFileSync(path.join(__dirname,'../src/battle.js'),'utf8');
-const sectorInfoCode=fs.readFileSync(path.join(__dirname,'../src/game.js'),'utf8').match(/function sectorInfo\(id\)\{[^\n]+\}/)[0];
+const sectorInfoCode=code.match(/function sectorInfo\(id\)\{[^\n]+\}/)[0];
 function combat(){
  let entropy=100;
  const c={CELL:48,WIDTH:1152,HEIGHT:576,crypto:{getRandomValues:bytes=>{bytes[0]=++entropy;return bytes;}},

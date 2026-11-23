@@ -30,8 +30,9 @@ const TOWERS={
  pulse:{name:'Импульс',cost:65,damage:18,rate:.48,range:145,color:'#6bdfef',speed:520,desc:'Скорострельная башня против наземных и воздушных целей. Выгодна против лёгких дронов.',special:'Земля и воздух'},
  cannon:{name:'Мортира',cost:125,damage:48,rate:1.35,range:155,color:'#ffb56b',speed:270,splash:67,desc:'Только наземные цели. Разрывные снаряды наносят урон по площади. Обе специализации усиливают покрытие взрывами.',special:'Площадь · только земля'},
  frost:{name:'Крио',cost:90,damage:7,rate:.8,range:130,color:'#8cbaff',speed:370,slow:.48,desc:'Замедляет наземные и воздушные цели на 52% на 1.8 секунды. Поддерживает соседние орудия.',special:'Замедление 52%'},
- rail:{name:'Рельса',cost:180,damage:100,rate:1.8,range:240,color:'#c6a1ff',speed:1000,pierce:true,desc:'Атакует землю и воздух, игнорирует броню. Эффективна против броневиков и тяжёлых штурмовиков.',special:'Игнорирует броню'}
+ rail:{name:'Рельса',cost:100,damage:49,rate:1.8,range:240,color:'#c6a1ff',speed:1000,pierce:true,desc:'Атакует землю и воздух, игнорирует броню. Эффективна против броневиков и тяжёлых штурмовиков.',special:'Игнорирует броню'}
 };
+TOWERS.garrison={name:'Гарнизон',cost:75,damage:6,rate:.9,range:150,color:'#9bf1cf',speed:500,desc:'Три робота выходят из казармы и идут к флагу. Каждый задерживает одну цель; свободные бойцы помогают против общей цели. Погибшие восстанавливаются за 9 с и снова идут на позицию.',special:'Три бойца · точка сбора'};
 const ENEMIES={
  scout:{name:'Разведчики',hp:46,speed:65,reward:9,armor:0,damage:1,color:'#f4be84',radius:9,symbol:'◇'},
  runner:{name:'Бегуны',hp:32,speed:112,reward:9,armor:0,damage:1,color:'#f08b9c',radius:8,symbol:'»'},
@@ -81,7 +82,7 @@ function chooseTarget(tower, enemies = state.enemies) {
  return target;
 }
 
-function upgradeCost(t){return Math.round(TOWERS[t.type].cost*(state.mode==='campaign'?(t.level===1?.6:.95):(t.level===1?.9:1.4)));}
+
 function sellValue(t){return Math.floor(t.invested*.7);}
 function pointOnPath(distance,routeIndex=0,flying=false){
  const route=(flying?AIR_ROUTES:ROUTES)[routeIndex],d=clamp(distance,0,route.length),seg=route.segments.find(s=>d<=s.start+s.length)||route.segments.at(-1),f=clamp((d-seg.start)/seg.length,0,1);
@@ -146,7 +147,7 @@ function placeAt(c,r){
 }
 function upgradeSelected(){
  const t=selectedTower();if(!t||t.level>=towerLevelCap()||t.disabled||paused||!['build','wave'].includes(state.phase))return;
- if(t.level===2){showContext('tower',{c:t.c,r:t.r});notify('Выбери специализацию для третьего уровня.');return;}
+ if(t.level===(state.mode==='campaign'?3:2)){showContext('tower',{c:t.c,r:t.r});notify('Выбери специализацию следующей ступени.');return;}
  const cost=upgradeCost(t);if(state.money<cost){notify('Для улучшения нужно '+cost+' кредитов.',true);return;}
  state.money-=cost;t.invested+=cost;t.level++;burst(t.x,t.y,TOWERS[t.type].color,20);floatText(t.x,t.y-26,'УРОВЕНЬ '+t.level,'#d4fa7a');beep(780,.12,.045,'triangle');saveProgress();uiDirty=true;
 }
@@ -208,7 +209,7 @@ function completeWave(id){
  const w=state.waves.find(w=>w.id===id);if(!w||w.remaining>0)return;
  state.waves=state.waves.filter(w=>w.id!==id);state.completed++;const bonus=waveBonus(id);state.money+=bonus;state.score+=id*100+state.lives*10;
  state.phase=state.waves.length?'wave':'build';
- onBossWaveComplete(w);updateBest();notify('Волна '+id+' отбита! +'+bonus+' монет.');beep(660,.13,.04,'triangle');uiDirty=true;
+ onBossWaveComplete(w);updateBest();notify('Волна '+id+' отбита!'+(bonus?' +'+bonus+' монет.':''));beep(660,.13,.04,'triangle');uiDirty=true;
  announce('Волна '+id+' отбита.');
 }
 function loseGame(){
@@ -218,7 +219,7 @@ function loseGame(){
 }
 function update(dt){
  if(paused||state.rewardQueue.length||state.phase==='lose'||state.phase==='win'||ART.loading)return;
- state.time+=dt;progressTick(dt);tickScorchFields(dt);supportTick(dt);if(state.rewardQueue.length){saveProgress();return;}state.launchCooldown=Math.max(0,state.launchCooldown-dt);updateWaveClock(false);
+ state.time+=dt;progressTick(dt);tickScorchFields(dt);supportTick(dt);tickGarrisons(dt);if(state.rewardQueue.length){saveProgress();return;}state.launchCooldown=Math.max(0,state.launchCooldown-dt);updateWaveClock(false);
  for(const t of state.towers)t.recoil=Math.max(0,t.recoil-dt*6);
  if(state.phase==='wave'){
   spawnQueuedEnemies();
@@ -229,6 +230,7 @@ function update(dt){
   }
   if(state.phase!=='lose'){
    for(const t of state.towers){
+    if(t.type==='garrison')continue;
     if(t.disabled)continue;t.cooldown-=dt;if(t.cooldown>0)continue;
     const target=chooseTarget(t);
     if(target)fire(t,target);else t.cooldown=0;
@@ -283,8 +285,8 @@ function loadArt(){
    const timer=setTimeout(()=>done(null),30000);
    try{image=new Image();image.onload=()=>done(image);image.onerror=()=>done(null);image.src=url;}catch(e){done(null);}
   });
-  const [terrain,atlas,logo,uiAtlas,statusAtlas,airAtlas,planetAtlas,planetTerrainAtlas,campaignBackdrop,startBackdrop,battleBackdrop]=await Promise.all([load(data.terrain),load(data.atlas),load(data.logo),load(data.uiAtlas),load(data.statusAtlas),load(data.airAtlas),load(data.planetAtlas),load(data.planetTerrainAtlas),load(data.campaignBackdrop),load(data.startBackdrop),load(data.battleBackdrop)]);
-  Object.assign(ART,{terrain,atlas,logo,uiAtlas,statusAtlas,airAtlas,planetAtlas,planetTerrainAtlas,campaignBackdrop,startBackdrop,battleBackdrop,uiAtlasUrl:data.uiAtlas,ready:!!(terrain&&atlas)});
+  const [terrain,atlas,logo,uiAtlas,statusAtlas,airAtlas,planetAtlas,planetTerrainAtlas,campaignBackdrop,startBackdrop,battleBackdrop,frontierAtlas,garrisonAnimation]=await Promise.all([load(data.terrain),load(data.atlas),load(data.logo),load(data.uiAtlas),load(data.statusAtlas),load(data.airAtlas),load(data.planetAtlas),load(data.planetTerrainAtlas),load(data.campaignBackdrop),load(data.startBackdrop),load(data.battleBackdrop),load(data.sprites.frontierAtlasUrl),load(data.sprites.garrisonAnimationUrl)]);
+  Object.assign(ART,{garrisonAnimation,frontierAtlas,terrain,atlas,logo,uiAtlas,statusAtlas,airAtlas,planetAtlas,planetTerrainAtlas,campaignBackdrop,startBackdrop,battleBackdrop,uiAtlasUrl:data.uiAtlas,ready:!!(terrain&&atlas)});
   // CSS rejects very large data URL tokens. Icons only need small atlases.
   const cssAtlas=(image,width)=>{const c=document.createElement('canvas');c.width=Math.min(width,image.width);c.height=Math.round(image.height*c.width/image.width);c.getContext('2d').drawImage(image,0,0,c.width,c.height);return 'url("'+c.toDataURL('image/png')+'")';};
   if(statusAtlas)document.documentElement.style.setProperty('--status-atlas',cssAtlas(statusAtlas,384));
@@ -294,19 +296,19 @@ function loadArt(){
  }).catch(e=>{ART.ready=false;ART.error='asset loading';notify('Не удалось загрузить картинки: включён резервный режим.',true);return false;}).finally(()=>{ART.loading=false;$('artLoader').hidden=true;uiDirty=true;});
 }
 function sprite(g,key,x,y,width,angle=0,alpha=1,height=null){
- if(!ART.ready)return;const s=ART.sprites[key];if(!s||s.atlas==='air'&&!ART.airAtlas)return;
+ if(!ART.ready)return;const s=ART.sprites[key];if(!s||!spriteAtlas(s))return;
  const h=height??width*s.h/s.w;
  g.save();g.translate(x,y);if(angle)g.rotate(angle);g.globalAlpha*=alpha;
- g.drawImage(s.atlas==='air'?ART.airAtlas:ART.atlas,s.x,s.y,s.w,s.h,-s.px*width,-s.py*h,width,h);g.restore();
+ g.drawImage(spriteAtlas(s),s.x,s.y,s.w,s.h,-s.px*width,-s.py*h,width,h);g.restore();
 }
 const UNIT_PORTRAITS=Object.create(null);
 function refreshUnitArt(){
  if(!ART.ready)return;
  for(const type of Object.keys(ENEMIES)){
-  const s=ART.sprites['enemy_'+type];if(!s||s.atlas==='air'&&!ART.airAtlas)continue;
+  const s=ART.sprites['enemy_'+type];if(!s||!spriteAtlas(s))continue;
   const c=document.createElement('canvas');c.width=108;c.height=88;const g=c.getContext('2d');
   const scale=Math.min(98/s.w,78/s.h),w=s.w*scale,h=s.h*scale;
-  g.drawImage(s.atlas==='air'?ART.airAtlas:ART.atlas,s.x,s.y,s.w,s.h,(108-w)/2,(88-h)/2,w,h);
+  g.drawImage(spriteAtlas(s),s.x,s.y,s.w,s.h,(108-w)/2,(88-h)/2,w,h);
   UNIT_PORTRAITS[type]=c.toDataURL('image/png');
  }
 }
@@ -409,13 +411,14 @@ function updateVisuals(dt){
  if(fullEffects){for(const e of state.enemies){e.dustTimer=(e.dustTimer??0)-dt;if(e.dustTimer<=0&&e.hp>0&&!isAirUnit(e)){e.dustTimer=e.type==='boss'?.18:.4;if(FX.smoke.length<70)addSmoke(e.x-Math.cos(e.angle)*9,e.y-Math.sin(e.angle)*9,1,'#b29875',e.type==='boss'?4:2);}}}
 }
 function drawTower(t,ghost=false,g=ctx){
+ if(t.type==='garrison'){drawGarrisonTower(t,ghost,g);return;}
  const color=TOWERS[t.type].color,level=t.level||1,scale=1+(level-1)*.045,size=43*scale;
  g.save();g.globalAlpha=ghost?.55:t.disabled?.4:1;
  g.fillStyle='#0e1a2160';g.beginPath();g.ellipse(t.x+2,t.y+9,23*scale,15*scale,0,0,Math.PI*2);g.fill();
  if(!ART.ready){g.fillStyle='#293e48';g.fillRect(t.x-18,t.y-18,36,36);g.strokeStyle=color;g.strokeRect(t.x-18,t.y-18,36,36);g.restore();if(!ghost)paintRepairAlert(t,g);return;}
  sprite(g,'base_'+t.type,t.x,t.y,size,0,1,size);
- if(level>=2){g.strokeStyle=color+'b0';g.lineWidth=level===3?2.2:1;g.beginPath();g.ellipse(t.x,t.y+1,21*scale,20*scale,0,.17,Math.PI-.17);g.stroke();}
- if(level===3){g.fillStyle='#e3d9ae';for(const offset of[-1,1]){g.fillRect(t.x+offset*23-2,t.y-6,4,12);g.fillStyle=color;g.fillRect(t.x+offset*23-1,t.y-2,2,4);g.fillStyle='#e3d9ae';}}
+ if(level>=2){g.strokeStyle=color+'b0';g.lineWidth=level>=3?2.2:1;g.beginPath();g.ellipse(t.x,t.y+1,21*scale,20*scale,0,.17,Math.PI-.17);g.stroke();}
+ if(level>=3){g.fillStyle='#e3d9ae';for(const offset of[-1,1]){g.fillRect(t.x+offset*23-2,t.y-6,4,12);g.fillStyle=color;g.fillRect(t.x+offset*23-1,t.y-2,2,4);g.fillStyle='#e3d9ae';}}
  const angle=t.renderAngle??t.angle??-Math.PI/2,recoil=(t.recoil||0)*(t.type==='cannon'?4.5:2.5);
  sprite(g,'gun_'+t.type,t.x-Math.cos(angle)*recoil,t.y-Math.sin(angle)*recoil,t.type==='rail'?53*scale:t.type==='frost'?41*scale:47*scale,angle);
  if(t.type==='frost'&&!ghost){g.strokeStyle='#8cdcff70';g.lineWidth=1;g.beginPath();g.ellipse(t.x,t.y,8+Math.sin(state.time*4)*1.5,6,0,0,Math.PI*2);g.stroke();}
@@ -433,7 +436,7 @@ function drawEnemySprite(g,type,width,angle){
  g.restore();
 }
 function drawEnemy(e){
- const def=ENEMIES[e.type],w={scout:25,runner:28,armor:37,swarm:18,drone:39,gunship:56,guardian:37,medic:30,boss:58}[e.type],s=ART.sprites['enemy_'+e.type],h=s?w*s.h/s.w:w*.7;
+ const def=ENEMIES[e.type],w={scout:25,runner:28,armor:37,swarm:18,drone:39,gunship:56,guardian:37,medic:30,boss:58,spider:25,buggy:31,tank:43,hover:37,walker:45,shieldbot:33,repairbot:32,transport:42}[e.type],s=ART.sprites['enemy_'+e.type],h=s?w*s.h/s.w:w*.7;
  const moving=paused?0:Math.sin(state.time*(e.type==='runner'?24:13)+e.id),bob=e.type==='armor'?moving*.2:moving*(e.type==='boss'?1.2:.6);
  ctx.save();ctx.translate(e.x,e.y+bob);if(isAirUnit(e)){ctx.fillStyle='#08172155';ctx.beginPath();ctx.ellipse(7,17,w*.4,h*.23,0,0,Math.PI*2);ctx.fill();ctx.strokeStyle='#b2f5ff99';ctx.lineWidth=1;ctx.beginPath();ctx.arc(0,0,w*.55,Math.PI*.15,Math.PI*.85);ctx.stroke();}ctx.fillStyle='#14202b50';ctx.beginPath();ctx.ellipse(2,6,w*.46,h*.36,0,0,Math.PI*2);ctx.fill();
  if(e.slowUntil>state.time){ctx.strokeStyle='#a5ebffba';ctx.lineWidth=1.4;ctx.beginPath();ctx.ellipse(0,2,w*.58,h*.58+2,0,0,Math.PI*2);ctx.stroke();ctx.fillStyle='#c7f0ff';for(let i=0;i<4;i++){const a=state.time*.9+i*Math.PI/2;ctx.fillRect(Math.cos(a)*w*.6,Math.sin(a)*h*.6,2,2);}}
@@ -498,7 +501,7 @@ function render(){
  }
  drawSupportCoverage(selected);
  for(const t of state.towers)drawTower(t);
- drawCore();drawProgressionEffects();for(const e of state.enemies)if(e.hp>0&&!isAirUnit(e))drawEnemy(e);for(const e of state.enemies)if(e.hp>0&&isAirUnit(e))drawEnemy(e);
+ drawCore();drawProgressionEffects();for(const e of state.enemies)if(e.hp>0&&!isAirUnit(e))drawEnemy(e);drawGarrisonUnits(ctx);for(const e of state.enemies)if(e.hp>0&&isAirUnit(e))drawEnemy(e);
  for(const b of state.shots)drawProjectile(b);drawEffects();drawAbilityEffects();paintCommanderEffects();
  ctx.font='700 10px system-ui';ctx.textAlign='center';ctx.lineWidth=2.5;ctx.strokeStyle='#15222be0';
  for(const f of floaters){ctx.save();ctx.globalAlpha=Math.min(1,f.life*2);ctx.fillStyle=f.color;ctx.translate(f.x,f.y);if(VIEW.rotated)ctx.rotate(-Math.PI/2);ctx.strokeText(f.text,0,0);ctx.fillText(f.text,0,0);ctx.restore();}ctx.globalAlpha=1;
@@ -646,7 +649,7 @@ function cellFromEvent(e){
 function anyDialogOpen(){return MODALS.some(id=>$(id)?.open);}
 function closeContextPanel(clearSelection=true){
  UI.context=null;UI.cell=null;UI.anchor=null;$('contextPanel').hidden=true;
- if(clearSelection){abilityAim=null;abilityPointer=null;selectedType=null;selectedId=null;hover=null;}uiDirty=true;
+ if(clearSelection){rallyTargetId=null;abilityAim=null;abilityPointer=null;selectedType=null;selectedId=null;hover=null;}uiDirty=true;
 }
 function positionContextPanel(){
  const el=$('contextPanel');if(!UI.context||!el||el.hidden||typeof el.getBoundingClientRect!=='function')return;
@@ -671,6 +674,7 @@ function interactCell(c,r){
  selectedId=null;hover={c,r};showContext('build',{c,r});
 }
 function handleBoardTap(e){
+ if(rallyTargetId!==null&&e.button===0){if(cameraClickBlocked())return;const rect=canvas.getBoundingClientRect(),p=screenToWorld(e.clientX-rect.left,e.clientY-rect.top);setGarrisonRally(p);e.stopPropagation?.();return;}
  if(e.button!==0)return;if(cameraClickBlocked()){e.preventDefault?.();e.stopPropagation?.();return;}e.stopPropagation?.();closePerkTooltip();if(abilityAim){const rect=canvas.getBoundingClientRect(),p=screenToWorld(e.clientX-rect.left,e.clientY-rect.top);if(p.inside)castAbility('orbital',p);else closeContextPanel();return;}const p=cellFromEvent(e);if(!p){closeContextPanel();return;}
  keyboardCell={...p};hover={...p};interactCell(p.c,p.r);
 }
@@ -755,6 +759,7 @@ function initShell(restored){
 
 // Run progression, mutually exclusive tower specializations and commander abilities.
 const BRANCHES={
+ garrison:{sentinel:{name:'Бастион',mark:'⬡',color:'#91edcc',desc:'Бронированные роботы: вдвое больше прочности, выдерживают огонь тяжёлых машин.'},rangers:{name:'Рейнджеры',mark:'⌖',color:'#b8d8ff',desc:'Бойцы стреляют с дистанции 2.3 клетки, урон +60%; меньше прочности.'}},
  pulse:{rapid:{name:'Шквал',mark:'Ⅱ',desc:'Интервал между выстрелами −48%; урон попадания −15%. Сильнее против лёгких целей, броню не игнорирует.',color:'#6bdfef'},piercer:{name:'Пробойник',mark:'◆',desc:'На 45% больше урона, игнорирует броню; стреляет на 11% реже.',color:'#f4d493'}},
  cannon:{blast:{name:'Ковровый огонь',mark:'◎',desc:'Радиус взрыва +55%; урон каждого попадания ниже на 15%.',color:'#ffb56b'},scorch:{name:'Выжженная земля',mark:'♨',desc:'Горящий участок на 3 с. Урон разрыва −35%, радиус −15%, интервал +10%. Только наземные цели.',color:'#ff914b'}},
  frost:{permafrost:{name:'Вечная мерзлота',mark:'❄',desc:'Замедляет на 76% на 3 секунды; урон ниже на 15%.',color:'#a1e7ff'},blizzard:{name:'Метель',mark:'✣',desc:'Замедляет группу в радиусе 1.25 клетки на 38% на 1.6 секунды.',color:'#b6bdff'}},
@@ -788,9 +793,9 @@ function passiveShieldCapacity(){return 2*perkRank('coreShield');}
 function abilityCooldown(id){return ABILITIES[id].cooldown*Math.pow(.9,perkRank('tactics'))*(state.mode==='campaign'&&state.difficulty===2&&state.sectorId%4===1&&id==='orbital'?1.25:1);}
 
 function chooseBranch(id){
- const t=selectedTower();if(!t||t.disabled||t.level<2||t.branch||paused||state.rewardQueue.length||!sessionStarted||state.phase==='lose'||!Object.hasOwn(BRANCHES[t.type],id)||towerLevelCap()<3)return false;
- const cost=t.level===3?0:upgradeCost(t);if(state.money<cost){notify('Для специализации нужно '+cost+' кредитов.',true);return false;}
- state.money-=cost;t.invested+=cost;t.level=3;t.branch=id;t.cooldown=Math.min(t.cooldown,towerStats(t).rate);
+ const t=selectedTower();if(!t||t.disabled||t.level<(state.mode==='campaign'?3:2)||t.branch||paused||state.rewardQueue.length||!sessionStarted||state.phase==='lose'||!Object.hasOwn(BRANCHES[t.type],id)||towerLevelCap()<(state.mode==='campaign'?4:3))return false;
+ const targetLevel=state.mode==='campaign'?4:3;const cost=t.level===targetLevel?0:upgradeCost(t);if(state.money<cost){notify('Для специализации нужно '+cost+' кредитов.',true);return false;}
+ state.money-=cost;t.invested+=cost;t.level=targetLevel;t.branch=id;t.cooldown=Math.min(t.cooldown,towerStats(t).rate);
  burst(t.x,t.y,BRANCHES[t.type][id].color,24);ring(t.x,t.y,BRANCHES[t.type][id].color,42,.65);floatText(t.x,t.y-24,BRANCHES[t.type][id].name,'#d4fa7a');
  saveProgress();uiDirty=true;beep(820,.14,.05,'triangle');notify(BRANCHES[t.type][id].name+' · специализация установлена');return true;
 }
@@ -820,7 +825,8 @@ function castAbility(id,point=null){
   const duration=1+.25*perkRank('cryo');for(const e of state.enemies)if(e.hp>0)e.stunUntil=Math.max(e.stunUntil||0,state.time+(e.type==='boss'?1.6:4)*duration);
   empVisual();beep(140,.25,.05,'sawtooth');notify('ЭМИ: движение противников остановлено');
  }else if(id==='orbital'){
-  state.orbitalStrikes.push({x:point.x,y:point.y,remaining:1.05,radius:108*(1+.15*perkRank('blast')),damage:Math.round((240+state.wave*38)*(1+.12*perkRank('reactor')))});
+  const orbitalDamage=state.mode==='campaign'?320+state.sectorId*5+120*(state.difficulty?activeAssaultPhase()/20:state.wave/state.goalWaves):240+state.wave*38;
+  state.orbitalStrikes.push({x:point.x,y:point.y,remaining:1.05,radius:108*(1+.15*perkRank('blast')),damage:Math.round(orbitalDamage*(1+.12*perkRank('reactor')))});
   beep(820,.16,.04,'sine');notify('Орбитальный удар: цель подтверждена');
  }else{
   state.coreShield=8;state.shieldUntil=state.time+12;ring(CORE.x,CORE.y,'#8dffd6',62,.7,'shield');beep(620,.17,.05,'triangle');notify('Щит активен на 12 с · защита от 8 урона');
@@ -877,11 +883,11 @@ function drawBranchBadge(g,t){
  g.stroke();g.restore();
 }
 function refreshProgressionUI(){
- const t=selectedTower(),options=t&&t.level>=2&&!t.branch?Object.entries(BRANCHES[t.type]):[];
+ const t=selectedTower(),options=t&&t.level>=(state.mode==='campaign'?3:2)&&!t.branch&&towerLevelCap(t)>t.level?Object.entries(BRANCHES[t.type]):[];
  $('branchOptions').hidden=!options.length;
  if(options.length){
-  $('branchNote').textContent=t.level===3?'Для прежней башни выбор бесплатный. Специализацию можно выбрать один раз.':'Выбери специализацию для 3-го уровня. Обе ветки включают усиление уровня.';
-  options.forEach(([id,def],i)=>{const el=$(i===0?'branchA':'branchB');el.dataset.branch=id;el.querySelector('strong').textContent=def.name;el.querySelector('small').textContent=specializationDescription(t,id);el.querySelector('b').textContent=t.level===3?'Бесплатно':upgradeCost(t)+' кр.';el.disabled=paused||state.phase==='lose'||state.money<(t.level===3?0:upgradeCost(t));});
+  $('branchNote').textContent=t.level===(state.mode==='campaign'?4:3)?'Для прежней башни выбор бесплатный. Специализацию можно выбрать один раз.':'Выбери специализацию IV ступени. Ветки включают усиление уровня.';
+  options.forEach(([id,def],i)=>{const el=$(i===0?'branchA':'branchB');el.dataset.branch=id;el.querySelector('strong').textContent=def.name;el.querySelector('small').textContent=specializationDescription(t,id);el.querySelector('b').textContent=t.level===(state.mode==='campaign'?4:3)?'Бесплатно':upgradeCost(t)+' кр.';el.disabled=paused||state.phase==='lose'||state.money<(t.level===(state.mode==='campaign'?4:3)?0:upgradeCost(t));});
   $('upgradeBtn').textContent='Выбери специализацию ниже';$('upgradeBtn').disabled=true;
  }
  if(t){const s=towerStats(t);$('selectionName').textContent=t.branch?BRANCHES[t.type][t.branch].name:TOWERS[t.type].name;$('selectionDesc').textContent=t.branch?specializationDescription(t):TOWERS[t.type].desc;
@@ -1110,10 +1116,10 @@ function refreshUI(){
  $('pauseBtn').innerHTML=paused?PLAY_ICON:PAUSE_ICON;$('pauseBtn').setAttribute('aria-pressed',String(paused));$('pauseBtn').setAttribute('aria-label',paused?'Продолжить':'Пауза');$('pauseBtn').disabled=state.phase==='lose';$('speedBtn').textContent=speed+'×';
  document.querySelectorAll('.tower-card').forEach(el=>{const active=el.dataset.type===selectedType;el.classList.toggle('selected',active);el.classList.toggle('unaffordable',TOWERS[el.dataset.type].cost>state.money);el.setAttribute('aria-pressed',String(active));});
  const t=selectedTower(),type=t?t.type:(selectedType||'pulse'),s=towerStats(t||{type,level:1});
- $('selectionName').textContent=s.name;$('selectionLevel').textContent=t?'УРОВЕНЬ '+t.level+' / 3':'ЧЕРТЁЖ';$('selectionDesc').textContent=s.desc;$('damageStat').textContent=s.damage;$('rateStat').textContent=(1/s.rate).toFixed(1);$('rangeStat').textContent=(s.range/CELL).toFixed(1)+' клетки';$('specialStat').textContent=type==='frost'?'Замедление '+Math.round((1-s.slow)*100)+'%':s.special;
+ $('selectionName').textContent=s.name;$('selectionLevel').textContent=t?'УРОВЕНЬ '+t.level+' / '+towerLevelCap(t):'ЧЕРТЁЖ';$('selectionDesc').textContent=s.desc;$('damageStat').textContent=s.damage;$('rateStat').textContent=(1/s.rate).toFixed(1);$('rangeStat').textContent=(s.range/CELL).toFixed(1)+' клетки';$('specialStat').textContent=type==='frost'?'Замедление '+Math.round((1-s.slow)*100)+'%':s.special;
  drawPortrait(type,t?t.level:1);
  $('selectionActions').hidden=!t;
- if(t){$('upgradeBtn').textContent=t.level===3?'Максимальный уровень':'Улучшить · '+upgradeCost(t);$('upgradeBtn').disabled=t.level===3||state.money<upgradeCost(t)||paused||state.phase==='lose';$('sellBtn').textContent='Продать · +'+sellValue(t);$('sellBtn').disabled=paused||state.phase==='lose';}
+ if(t){$('upgradeBtn').textContent=t.level>=towerLevelCap(t)?'Максимальный уровень':'Улучшить · '+upgradeCost(t);$('upgradeBtn').disabled=t.level>=towerLevelCap(t)||state.money<upgradeCost(t)||paused||state.phase==='lose';$('sellBtn').textContent='Продать · +'+sellValue(t);$('sellBtn').disabled=paused||state.phase==='lose';}
  let hint='Подготовь оборону. Первая волна — по кнопке или Space, без таймера и бонуса.',key='↵';
  if(state.wave>0)hint='Вызови волну '+next+' раньше: +'+bonus+' монет. Новая атака начнётся поверх текущей.';
  if(t){hint=s.name+' · цель ближе всех к ядру в радиусе. U — улучшить, X — продать.';key='U';}
@@ -1445,7 +1451,7 @@ function drawScorchFields(){
 }
 function specializationDescription(t,branch=t.branch){
  const text=BRANCHES[t.type][branch].desc;
- return branch==='scorch'?text+' Ожог: '+towerStats({...t,level:3,branch}).scorchDps+' урона/с, игнорирует броню. Перекрытия не складываются.':text;
+ return branch==='scorch'?text+' Ожог: '+towerStats({...t,level:state.mode==='campaign'?4:3,branch}).scorchDps+' урона/с, игнорирует броню. Перекрытия не складываются.':text;
 }
 function migrateV24Run(run){
  for(const t of run.towers||[])if(t.type==='cannon'&&['siege','cluster'].includes(t.branch))t.branch='scorch';
@@ -1487,43 +1493,17 @@ function difficultyUnlocked(id,difficulty){
  return testModeActive||(appData.profile.cleared[id]&required)===required;
 }
 function commanderKind(id){return [6,13,20,28].includes(id)?Math.min(3,Math.floor(id/7)):-1;}
-function bossHealthForSector(id){const kind=commanderKind(id);return kind<0?620+id*105:BOSS_KINDS[kind].hp;}
+
 function missionInfo(id,difficulty=0){
  const base=sectorInfo(id),assault=difficulty>0;
- return {...base,difficulty,assault,maxCore:difficulty===0?20:difficulty===1?8:5,waves:assault?1:base.waves,phases:assault?4:base.waves,
+ return {...base,difficulty,assault,maxCore:difficulty===0?20:difficulty===1?8:5,waves:assault?1:base.waves,phases:assault?20:base.waves,
   budget:campaignOpeningBudget(id,difficulty),theme:SECTOR_THEMES[id],bossKind:commanderKind(id),
   recommendation:difficulty===0?Math.max(0,id-1):difficulty===1?3+id*2:8+id*2,
   modifier:difficulty===2?['Плотный строй','Радиопомехи','Быстрый фланг','Элитный эскорт'][id%4]:''};
 }
-function captureArsenal(){
- const progress=standardProgress(),types={pulse:true,cannon:progress>=1,frost:progress>=2,rail:progress>=4};
- const unlock3={pulse:7,cannon:9,frost:11,rail:13},caps={};
- for(const type of Object.keys(TOWERS)){
-  if(testModeActive){types[type]=true;caps[type]=3;}
-  else caps[type]=types[type]?(progress>=unlock3[type]?3:progress>=3?2:1):0;
- }
- return {progress,types,caps};
-}
-function arsenalDescription(a=captureArsenal()){return Object.keys(TOWERS).filter(t=>a.types[t]).map(t=>TOWERS[t].name+' '+['','I','II','III'][a.caps[t]]).join(' · ');}
-function sectorBlueprint(id){
- const blueprint=baseSectorBlueprint(id),raw=blueprint.raw.map(r=>({...r,cells:r.cells.map(p=>[...p])}));
- // Convert the outermost horizontal approaches into north/south entrances.
- const order=raw.map((r,i)=>({i,y:r.cells[0][1]})).sort((a,b)=>a.y-b.y);
- const candidates=[];
- if(!blueprint.fork&&id%4!==0)candidates.push({index:order[0].i,side:-1});
- if(!blueprint.fork&&raw.length>1&&id%3!==0)candidates.push({index:order.at(-1).i,side:ROWS});
- for(const {index,side}of candidates){
-  const original=raw[index].cells;
-  for(const c of [2,4,6,8]){
-   if(c>=original[1][0]-1)continue;
-   raw[index].cells=[[c,side],[c,original[0][1]],...original.slice(1)];
-   try{validateRoadClearance(raw);break;}catch(_e){raw[index].cells=original;}
-  }
- }
- const reflect=id%3===1;
- return {...blueprint,raw:raw.map(r=>({...r,cells:r.cells.map(([x,y])=>[reflect?COLS-1-x:x,y])})),
-  anchors:blueprint.anchors.map(a=>({...a,c:reflect?COLS-1-a.c:a.c})),name:THEME_NAMES[SECTOR_THEMES[id]]};
-}
+
+
+
 function drawEntryPort(g,route){
  const a=route.points[0],b=route.points[1],angle=Math.atan2(b.y-a.y,b.x-a.x);
  const x=clamp(a.x+Math.cos(angle)*CELL*.7,8,WIDTH-8),y=clamp(a.y+Math.sin(angle)*CELL*.7,8,HEIGHT-8);
@@ -1540,9 +1520,7 @@ function missionPool(id,phase,difficulty){
  return Object.entries(weights).flatMap(([type,weight])=>Array(weight).fill(type));
 }
 function sectorWavePlan(wave){return planCampaignAttack(wave);}
-function activeAssaultPhase(){
- return Math.min(4,Math.max(1,state.assaultPhase||1));
-}
+
 function spawnEnemy(item){baseSpawnEnemy(item);initialiseCombatEnemy(state.enemies.at(-1),item);}
 function spawnReinforcement(owner,type){
  const wave=state.waves.find(w=>w.id===owner.wave);if(!wave)return;
@@ -1566,8 +1544,8 @@ function refreshCampaignUI(){
  $('menuLeaveBtn').hidden=!sessionStarted;$('menuRestartBtn').hidden=!sessionStarted;
  $('techTreeBtn').hidden=campaign;$('researchBtn').hidden=campaign&&sessionStarted;$('hudTechPoints').textContent=profilePoints();
  $('techTreeBtn').classList.remove('has-points');$('techTreeBtn').title='Технологии · покупки между боями';
- $('waveValue').textContent=assault?(state.wave?'Фаза '+activeAssaultPhase()+' / 4':'Штурм'):campaign?state.wave+' из '+state.goalWaves:state.wave+' / ∞';
- $('waveValue').setAttribute('aria-label',assault?'Фаза штурма '+activeAssaultPhase()+' из 4':'Волна '+state.wave);
+ $('waveValue').textContent=assault?(state.wave?'Отряд '+activeAssaultPhase()+' / 20':'Штурм'):campaign?state.wave+' из '+state.goalWaves:state.wave+' / ∞';
+ $('waveValue').setAttribute('aria-label',assault?'Отряд штурма '+activeAssaultPhase()+' из 20':'Волна '+state.wave);
  $('battleSector').textContent=campaign?String(m.id+1).padStart(2,'0')+' / '+m.name+' · '+DIFFICULTIES[state.difficulty].name+' · '+THEME_NAMES[m.theme]:'БЕСКОНЕЧНАЯ ОБОРОНА';
  const t=selectedTower();$('selectionLevel').textContent=t?'УРОВЕНЬ '+t.level+' / '+towerLevelCap(t):'ЧЕРТЁЖ';
  document.querySelectorAll('.tower-card').forEach(el=>{const allowed=towerAllowed(el.dataset.type);el.disabled=!allowed;el.title=allowed?TOWERS[el.dataset.type].desc:'Открывается по ходу Стандарта';el.classList.toggle('tower-banned',!allowed);});
@@ -1575,14 +1553,14 @@ function refreshCampaignUI(){
  if(t&&t.level>=towerLevelCap(t)){$('upgradeBtn').textContent='Доступный уровень: '+towerLevelCap(t);$('upgradeBtn').disabled=true;$('branchOptions').hidden=true;}
  if(!assault){$('nextWaveNumber').textContent=campaign?nextPreviewWave()+' / '+state.goalWaves:String(nextPreviewWave()).padStart(2,'0');refreshWaveClockUI();}
  else{
-  $('nextWaveNumber').textContent='ШТУРМ';$('nextWaveTimer').textContent=state.wave?'ФАЗА '+activeAssaultPhase()+' / 4':'ПО КОМАНДЕ';
+  $('nextWaveNumber').textContent='ШТУРМ';$('nextWaveTimer').textContent=state.wave?'ОТРЯД '+activeAssaultPhase()+' / 20':'ПО КОМАНДЕ';
   $('waveClockBar').style.width=state.wave?((state.kills/Math.max(1,state.waves[0]?.total||state.kills))*100)+'%':'0%';
   $('startLabel').textContent=state.wave?'Штурм идёт':'Начать штурм';$('startWave').disabled=paused||!!state.wave;
-  $('startWave').title='Один штурм из четырёх фаз. Отряды выходят по расписанию; бонусов вызова нет.';
-  const forecast=nextAttackForecast();$('intelNext').textContent='ФАЗА '+activeAssaultPhase()+' / 4';$('intelCount').textContent=state.wave?(forecast.items.length+' в следующем отряде'):'Первый отряд показан на входе';
+  $('startWave').title='Один штурм из двадцати отрядов. Отряды выходят по расписанию; бонусов вызова нет.';
+  const forecast=nextAttackForecast();$('intelNext').textContent='ОТРЯД '+activeAssaultPhase()+' / 20';$('intelCount').textContent=state.wave?(forecast.items.length+' в следующем отряде'):'Первый отряд показан на входе';
  }
  $('previewLabel').textContent=assault?'СОСТАВ ШТУРМА':'ВОЛНА '+nextPreviewWave()+(campaign?' / '+state.goalWaves:'');
- if(campaign){const plan=wavePlan(nextPreviewWave()),elites=plan.filter(e=>e.elite).length;$('previewText').textContent=plan.length+' врагов'+(elites?' · элита: '+elites:'')+' · '+(assault?'4 фазы':'отряды с промежутками');$('tipTitle').textContent=THEME_NAMES[m.theme];$('tipText').textContent=(m.modifier?m.modifier+'. ':'')+'Финал: '+(m.bossKind>=0?BOSS_KINDS[m.bossKind].name:'командир отряда')+' · '+bossHealthForSector(m.id)+' HP. Авиацию поражают Импульс и Рельса, Крио замедляет. Элита: ×2.6 HP, +7 брони, двойная награда. Щитоносец защищает соседей, ремонтник восстанавливает их.';}
+ if(campaign){const plan=wavePlan(nextPreviewWave()),elites=plan.filter(e=>e.elite).length;$('previewText').textContent=plan.length+' врагов'+(elites?' · элита: '+elites:'')+' · '+(assault?'20 отрядов':'отряды с промежутками');$('tipTitle').textContent=THEME_NAMES[m.theme];$('tipText').textContent=(m.modifier?m.modifier+'. ':'')+'Финал: '+(m.bossKind>=0?BOSS_KINDS[m.bossKind].name:'командир отряда')+' · '+bossHealthForSector(m.id)+' HP. Авиацию поражают Импульс и Рельса, Крио замедляет. Элита: ×2.6 HP, +7 брони, двойная награда. Щитоносец защищает соседей, ремонтник восстанавливает их.';}
  if(campaignAtFinal()&&!assault){$('startWave').disabled=true;$('startLabel').textContent=won?'Сектор защищён':'Финальный отряд';$('nextWaveTimer').textContent=won?'ПОБЕДА':'ФИНАЛ';$('waveClockBar').style.width='0%';}
  $('overlaySecondary').hidden=!ended;$('overlaySecondary').textContent=won?'Повторить сектор':campaign?'К карте кампании':'В главное меню';$('overlayStars').hidden=!won;
  if(won){$('boardOverlay').hidden=!sessionStarted||anyDialogOpen();$('boardOverlay').dataset.ended='false';$('pauseShortcut').hidden=true;$('overlayStars').innerHTML=campaignStarsArt(state.campaignStars);$('overlayTitle').textContent=m.id===28&&state.difficulty===0?'Кампания пройдена!':'Сектор защищён';$('overlayText').textContent=m.name+' · '+DIFFICULTIES[state.difficulty].name+' · '+state.lives+'/'+state.maxLives+' · '+timeLabel(state.time)+(state.pointAwarded?' · +1 очко технологий':' · очко уже получено');$('overlayAction').textContent='К карте кампании';}
@@ -1597,7 +1575,7 @@ function renderSectorDetails(){
  const m=missionInfo(selectedSector,selectedDifficulty),biome=BIOMES[m.biome],mask=appData.profile.cleared[m.id],a=captureArsenal();
  $('missionCard').style.setProperty('--sector-color',biome.color);$('sectorKicker').textContent=biome.name+' / СЕКТОР '+String(m.id+1).padStart(2,'0');$('sectorName').textContent=m.name;
  $('sectorPreview').innerHTML=sectorMiniMap(m.id);drawSectorPreview(m.id);
- $('sectorFacts').innerHTML='<span><b>'+ (m.assault?'1':' '+m.waves)+'</b> '+(m.assault?'штурм · 4 фазы':'волн')+'</span><span><b>'+m.budget+'</b> монет</span><span><b>'+sectorPads(m.id).length+'</b> мест</span>'+sectorStarsSummary(m.id);
+ $('sectorFacts').innerHTML='<span><b>'+ (m.assault?'1':' '+m.waves)+'</b> '+(m.assault?'штурм · 20 отрядов':'волн')+'</span><span><b>'+m.budget+'</b> монет</span><span><b>'+sectorPads(m.id).length+'</b> мест</span>'+sectorStarsSummary(m.id);
  $('difficultyOptions').innerHTML=DIFFICULTIES.map((d,i)=>{
   const unlocked=difficultyUnlocked(m.id,i),previous=DIFFICULTIES.find((_,j)=>j<i&&!(mask&(1<<j)))?.name;
   const hint=unlocked?(mask&(1<<i)?'✓ Пройдено':'+1 очко'):'Пройди '+(previous||'предыдущую сложность');
@@ -1606,7 +1584,7 @@ function renderSectorDetails(){
  $('missionReward').textContent=(mask&(1<<selectedDifficulty)?'Очко уже получено':'+1 очко за первую победу')+' · Ядро: '+m.maxCore+(m.assault?' · Ориентир: '+m.recommendation+' очков прокачки':'');
  $('missionDetailsTitle').textContent=m.name+' · '+DIFFICULTIES[selectedDifficulty].name;$('sectorDescription').textContent=THEME_NAMES[m.theme]+'. '+biome.desc+' Ядро: '+m.maxCore+' прочности.';
  const boss=m.bossKind>=0?BOSS_KINDS[m.bossKind].name:'Командир отряда';
- $('missionRules').innerHTML='<li>Доступный арсенал: <b>'+arsenalDescription(a)+'</b>. Уровни открываются за прохождение Стандарта и не понижаются сложностью.</li><li>'+(m.assault?'Один штурм из четырёх фаз. Отряды и короткие промежутки идут по расписанию. Досрочного вызова нет.':'Первая волна по команде. Следующие — после выпуска отряда, с паузами 5→0, 4→0 и далее. Одновременно до двух волн; ранний вызов даёт монеты.')+'</li><li>Финал: <b>'+boss+' · '+bossHealthForSector(m.id)+' HP</b>, вместе с сопровождением. Прорыв командира означает поражение.</li><li>'+(m.modifier?'Условие Кошмара: <b>'+m.modifier+'</b>.':'Базовые HP обычных юнитов не растут по секторам. Сложность задают состав, темп и взаимодействие отрядов.')+'</li><li>Технологии учитываются. '+(m.assault?'Рекомендуемый бюджет прокачки: '+m.recommendation+' очков. Это ориентир, запуск доступен и без них.':'Новые типы башен: после секторов 1, 2 и 4. II уровень — после сектора 3. III уровни по очереди после 7, 9, 11 и 13.')+'</li><li>Монеты за юнитов зависят от типа; элита ×2. Звёзды: победа / не менее половины прочности / без прорывов.</li>';
+ $('missionRules').innerHTML='<li>Доступный арсенал: <b>'+arsenalDescription(a)+'</b>. Уровни открываются за прохождение Стандарта и не понижаются сложностью.</li><li>'+(m.assault?'Один штурм из двадцати отрядов. Отряды и короткие промежутки идут по расписанию. Досрочного вызова нет.':'Первая волна по команде. Следующие — после выпуска отряда, с паузами 5→0, 4→0 и далее. Одновременно до двух волн; ранний вызов даёт монеты.')+'</li><li>Финал: <b>'+boss+' · '+bossHealthForSector(m.id)+' HP</b>, вместе с сопровождением. Прорыв командира означает поражение.</li><li>'+(m.modifier?'Условие Кошмара: <b>'+m.modifier+'</b>.':'Базовые HP обычных юнитов не растут по секторам. Сложность задают состав, темп и взаимодействие отрядов.')+'</li><li>Технологии учитываются. '+(m.assault?'Рекомендуемый бюджет прокачки: '+m.recommendation+' очков. Это ориентир, запуск доступен и без них.':'Импульс, Мортира и Гарнизон доступны сразу. Рельса — после сектора 1, Крио — после 2. II ступень — после 1, III — после 2; специализации IV — после 5–9.')+'</li><li>Монеты за юнитов зависят от типа; элита ×2. Звёзды: победа / не менее половины прочности / без прорывов.</li>';
  $('deployBtn').disabled=!difficultyUnlocked(m.id,selectedDifficulty);$('deployBtn').textContent=m.assault?'Начать штурм':'Защитить сектор';
 }
 
@@ -1653,7 +1631,7 @@ function initTestLab(){
 
 // v12: deterministic campaign maps, persistent commander, isolated battle slots.
 const SECTOR_COUNT=29,ELITE_HP_MULTIPLIER=2.6,ELITE_EXTRA_ARMOR=7;
-const CAMPAIGN_ENEMY_HP={scout:620,runner:680,armor:1600,swarm:70,drone:90,gunship:680,guardian:1300,medic:850,boss:7000};
+const CAMPAIGN_ENEMY_HP={scout:220,runner:150,armor:900,swarm:70,drone:135,gunship:850,guardian:950,medic:650,boss:7000,spider:58,buggy:180,tank:1100,hover:700,walker:1600,shieldbot:620,repairbot:640,transport:1000};
 const APP_KEY='kontur_campaign_v12';
 const ENDLESS_ROUTES=ROUTES.map(r=>({...r,cells:r.cells.map(p=>[...p])}));
 const BIOMES=[
@@ -1665,11 +1643,11 @@ const BIOMES=[
 const SECTOR_NAMES=['Форпост','Красная низина','Сухой каньон','Станция «Песок»','Плато связи','Карьер Гелиос','Пыльный бастион','Ледопад','Полярная дуга','Белая трещина','Криостанция','Нулевая широта','Осколки льда','Северный заслон','Ионный разлом','Тихая орбита','Плазменный берег','Грозовой узел','Пик Обсерватории','Долина Эхо','Станция Вега','Пепельные ворота','Рубеж Титан','Кольцо защиты','Медный горизонт','Сектор Аврора','Последний маяк','Цитадель','Сердце контура'];
 const DIFFICULTIES=[
  {name:'Стандарт',cap:3,count:1,desc:'Отдельные волны, сюжет и открытие арсенала.'},
- {name:'Ветеран',cap:3,count:1.3,desc:'Один штурм из четырёх фаз. Технологии дают преимущество.'},
+ {name:'Ветеран',cap:3,count:1.3,desc:'Один штурм из двадцати отрядов. Технологии дают преимущество.'},
  {name:'Кошмар',cap:3,count:1.65,desc:'Один усиленный штурм с особым условием сектора.'}
 ];
 let appScreen='home',selectedSector=0,selectedDifficulty=0;
-function sectorInfo(id){const biome=Math.min(3,Math.floor(id/7)),routes=CAMPAIGN_ROAD_COUNTS[id];return{id,name:SECTOR_NAMES[id],biome,routes,waves:10+Math.floor(id*10/28),budget:campaignOpeningBudget(id)};}
+
 
 function installRoutes(raw){
  validateRoadClearance(raw);
@@ -1743,18 +1721,18 @@ function validateRun(s){
  const finite=(n,min=0,max=Number.MAX_SAFE_INTEGER)=>Number.isFinite(n)&&n>=min&&n<=max;
  const integer=(n,min=0,max=Number.MAX_SAFE_INTEGER)=>Number.isSafeInteger(n)&&n>=min&&n<=max;
  if(!s||!['campaign','endless'].includes(s.mode)||!['build','wave','win','lose'].includes(s.phase))return false;
- if(s.mode==='campaign'&&(!integer(s.sectorId,0,28)||!integer(s.difficulty,0,2)||s.encounterVersion!==undefined&&![30,31].includes(s.encounterVersion)||s.goalWaves!==(s.difficulty>0?1:s.encounterVersion>=31?sectorInfo(s.sectorId).waves:legacyCampaignWaves(s.sectorId))))return false;
+ if(s.mode==='campaign'&&(!integer(s.sectorId,0,28)||!integer(s.difficulty,0,2)||s.encounterVersion!==undefined&&![30,31,32].includes(s.encounterVersion)||s.goalWaves!==(s.difficulty>0?1:s.encounterVersion>=31?sectorInfo(s.sectorId).waves:legacyCampaignWaves(s.sectorId))))return false;
  if(!integer(s.wave,0,s.mode==='campaign'?s.goalWaves:100000)||!integer(s.completed,0,s.wave)||!integer(s.lives,0,20)||!integer(s.money)||!integer(s.nextId,1)||!finite(s.time)||!finite(s.score)||!integer(s.kills)||!finite(s.nextWaveIn,0,60)||!finite(s.launchCooldown,0,2)||!finite(s.spawnTimer,-1,600))return false;
  for(const key of ['towers','enemies','queue','waves','shots','orbitalStrikes'])if(!Array.isArray(s[key]))return false;
- if(s.mode==='campaign'&&(s.rulesVersion!==30||s.maxLives!==missionInfo(s.sectorId,s.difficulty).maxCore||s.lives>s.maxLives||!s.arsenal||Object.keys(TOWERS).some(t=>typeof s.arsenal.types?.[t]!=='boolean'||!integer(s.arsenal.caps?.[t],0,3))))return false;
+ if(s.mode==='campaign'&&(s.rulesVersion!==31||s.maxLives!==missionInfo(s.sectorId,s.difficulty).maxCore||s.lives>s.maxLives||!s.arsenal||Object.keys(TOWERS).some(t=>typeof s.arsenal.types?.[t]!=='boolean'||!integer(s.arsenal.caps?.[t],0,4))))return false;
  if(s.towers.length>288||s.enemies.length+s.queue.length>2400||s.shots.length>2400||s.waves.length>(s.mode==='campaign'?2:4)||s.orbitalStrikes.length>4)return false;
  if(!s.research||Object.entries(s.research).some(([id,r])=>!PERKS[id]||PERKS[id].instant||!integer(r,0,PERKS[id].max)))return false;
  if(!s.abilities||Object.keys(ABILITIES).some(id=>!finite(s.abilities[id],0,ABILITIES[id].cooldown*(s.mode==='campaign'&&s.difficulty===2&&s.sectorId%4===1&&id==='orbital'?1.25:1))))return false;
  if(!finite(s.coreShield,0,8)||!finite(s.passiveShield,0,2*(s.research.coreShield||0))||!finite(s.shieldUntil)||!finite(s.shieldRegenAt))return false;
  const used=new Set(),ids=new Set(),active=new Map();let largest=0;
  const idValid=id=>{if(!integer(id,1)||ids.has(id))return false;ids.add(id);largest=Math.max(largest,id);return true;};
- for(const t of s.towers){const k=t.c+','+t.r;if(!TOWERS[t.type]||!integer(t.c,0,23)||!integer(t.r,0,11)||road.has(k)||used.has(k)||s.mode==='campaign'&&!sectorPads(s.sectorId).some(p=>p.c===t.c&&p.r===t.r)||!integer(t.level,1,s.mode==='campaign'?s.arsenal.caps[t.type]:3)||!finite(t.cooldown,-1,5)||!finite(t.angle,-100,100)||!idValid(t.id)||!finite(t.invested)||t.branch&&(!BRANCHES[t.type][t.branch]||t.level!==3)||s.mode==='campaign'&&bannedTowers(s.sectorId,s.difficulty).includes(t.type))return false;used.add(k);}
- for(const w of s.waves){if(!integer(w.id,1,s.wave)||active.has(w.id)||!integer(w.total,1,600)||!integer(w.remaining,1,w.total))return false;active.set(w.id,{count:0,remaining:w.remaining});}
+ for(const t of s.towers){const k=t.c+','+t.r;if(!TOWERS[t.type]||!integer(t.c,0,23)||!integer(t.r,0,11)||road.has(k)||used.has(k)||s.mode==='campaign'&&!sectorPads(s.sectorId).some(p=>p.c===t.c&&p.r===t.r)||!integer(t.level,1,s.mode==='campaign'?s.arsenal.caps[t.type]:3)||!finite(t.cooldown,-1,5)||!finite(t.angle,-100,100)||!idValid(t.id)||!finite(t.invested)||t.branch&&(!BRANCHES[t.type][t.branch]||t.level!==(s.mode==='campaign'?4:3))||s.mode==='campaign'&&bannedTowers(s.sectorId,s.difficulty).includes(t.type))return false;used.add(k);}
+ for(const w of s.waves){if(!integer(w.id,1,s.wave)||active.has(w.id)||!integer(w.total,1,1600)||!integer(w.remaining,1,w.total))return false;active.set(w.id,{count:0,remaining:w.remaining});}
  for(const e of s.enemies){if(e.bounty!==undefined&&!integer(e.bounty,0,200))return false;if(!ENEMIES[e.type]||!integer(e.route,0,ROUTES.length-1)||!active.has(e.wave)||!idValid(e.id)||!finite(e.hp,.001)||!finite(e.maxHp,e.hp)||!finite(e.distance,0,enemyRoute(e).length)||!finite(e.speed,1,300)||!finite(e.armor,0,10000)||!finite(e.stunUntil)||!finite(e.slowUntil)||!finite(e.slowFactor,.1,1))return false;active.get(e.wave).count++;}
  for(const q of s.queue){if(!finite(q.spawnAt))return false;if(q.gapAfter!==undefined&&!finite(q.gapAfter,0,16))return false;if(!ENEMIES[q.type]||!integer(q.route,0,ROUTES.length-1)||!active.has(q.wave))return false;active.get(q.wave).count++;}
  for(const w of active.values())if(w.count!==w.remaining)return false;
@@ -1766,11 +1744,11 @@ function validateRun(s){
  const clock=s.waveClock;
  if(s.wave===0?clock!==null:!clock||clock.version!==24||clock.fromWave!==s.wave||!finite(clock.openedAt,0,s.time)||!finite(clock.delay,0,5)||!finite(clock.bonusCap)||!finite(clock.bonusLast,0,clock.bonusCap)||!finite(clock.bonusDeadline)||clock.releaseAt!==null&&(!finite(clock.releaseAt,0,s.time)||!finite(clock.dueAt,clock.releaseAt,clock.releaseAt+5.001))||clock.releaseAt===null&&clock.dueAt!==null)return false;
  if(s.nextId<=largest||s.phase!=='lose'&&s.completed+s.waves.length!==s.wave||s.phase==='build'&&s.waves.length||s.phase==='wave'&&!s.waves.length||s.phase==='lose'&&s.lives!==0||s.phase!=='lose'&&s.lives===0)return false;
- return validateCombatState(s);
+ return validateCombatState(s)&&validateGarrisons(s);
 }
 function resumeSavedRun(mode){
  if(!resumable(mode))return false;
- const saved=migrateV19Run(JSON.parse(JSON.stringify(appData.runs[mode])));saved.bossShots??=[];if(mode==='campaign'&&saved.rulesVersion!==30){startBattle('campaign',saved.sectorId,saved.difficulty);notify('Кампания переработана: бой начат заново. Пройденные сектора и технологии сохранены.');return true;}if(mode==='endless'&&saved.mapVersion!==19){startBattle('endless');notify('Дороги разнесены: бесконечный бой начат заново.');return true;}installRoutes(mode==='campaign'?sectorRoutes(saved.sectorId):ENDLESS_ROUTES);
+ const saved=migrateV19Run(JSON.parse(JSON.stringify(appData.runs[mode])));saved.bossShots??=[];if(mode==='campaign'&&saved.rulesVersion!==31){startBattle('campaign',saved.sectorId,saved.difficulty);notify('Кампания переработана: бой начат заново. Пройденные сектора и технологии сохранены.');return true;}if(mode==='endless'&&saved.mapVersion!==19){startBattle('endless');notify('Дороги разнесены: бесконечный бой начат заново.');return true;}installRoutes(mode==='campaign'?sectorRoutes(saved.sectorId):ENDLESS_ROUTES);
  if(!validateRun(saved)){notify('Не удалось восстановить этот бой: сохранение повреждено. Остальной прогресс сохранён.',true);return false;}
  state=saved;state.bossShots??=[];for(const w of state.waves)w.totalThreat??=wavePlan(w.id).reduce((v,e)=>v+enemyThreat(e),0);state.rewardQueue=[];state.rewardedWaves=[];state.orbitalStrikes??=[];
  for(const e of state.enemies){Object.assign(e,pointOnPath(e.distance,e.route,isAirUnit(e)),{resolved:false,hit:0});if(e.commander)delete e.commander.bag;}
@@ -1785,7 +1763,7 @@ function deploySector(){
 function startBattle(mode,sectorId=0,difficulty=0){
  closeAllDialogs();closeContextPanel();endCameraGesture();abilityAim=null;state=freshState();state.mode=mode;
  state.research={...appData.profile.research};state.techPoints=0;state.techEarned=techSpentPoints(state.research);state.passiveShield=passiveShieldCapacity();
- if(mode==='campaign'){state.sectorId=sectorId;state.difficulty=difficulty;state.arsenal=captureArsenal();state.goalWaves=missionInfo(sectorId,difficulty).waves;state.maxLives=missionInfo(sectorId,difficulty).maxCore;state.lives=state.maxLives;state.rulesVersion=30;state.encounterVersion=31;state.nextWaveIn=0;state.finalBossKilled=false;state.money=missionInfo(sectorId,difficulty).budget;installRoutes(sectorRoutes(sectorId));}
+ if(mode==='campaign'){state.sectorId=sectorId;state.difficulty=difficulty;state.arsenal=captureArsenal();state.goalWaves=missionInfo(sectorId,difficulty).waves;state.maxLives=missionInfo(sectorId,difficulty).maxCore;state.lives=state.maxLives;state.rulesVersion=31;state.encounterVersion=32;state.nextWaveIn=0;state.finalBossKilled=false;state.money=missionInfo(sectorId,difficulty).budget;installRoutes(sectorRoutes(sectorId));}
  else{state.mapVersion=19;installRoutes(ENDLESS_ROUTES);}
  particles=[];beams=[];floaters=[];resetVisuals();progressSaveNeeded=false;speed=1;lastSave=0;centerMap();startSession();makeLandscape();saveProgress();
 }
@@ -1862,7 +1840,7 @@ function roadCells(routes){const set=new Set();for(const r of routes)for(const s
 
 function buildPadAt(c,r){return state.mode==='campaign'?sectorPads(state.sectorId).find(p=>p.c===c&&p.r===r):null;}
 // Nominal type rewards; extended standards share the original mission budget.
-const CAMPAIGN_BOUNTIES={swarm:2,scout:8,runner:8,armor:18,drone:4,gunship:18,guardian:20,medic:16,boss:80};
+const CAMPAIGN_BOUNTIES={swarm:3,scout:6,runner:6,armor:15,drone:5,gunship:20,guardian:22,medic:20,boss:0,spider:3,buggy:7,tank:18,hover:12,walker:27,shieldbot:15,repairbot:18,transport:21};
 function campaignBounty(type,elite=false){return CAMPAIGN_BOUNTIES[type]*(elite?2:1);}
 function enemyReward(e){return state.mode==='campaign'?(e.bounty??campaignBounty(e.type,e.elite)):ENEMIES[e.type].reward;}
 function drawBuildPad(g,p,occupied=false,preview=false){
@@ -1874,7 +1852,9 @@ function drawBuildPad(g,p,occupied=false,preview=false){
 function paintSector(g,routes,pads,biome){
  if(ART.planetTerrainAtlas){const image=ART.planetTerrainAtlas,w=image.width/2,h=image.height/2;g.drawImage(image,(biome%2)*w,Math.floor(biome/2)*h,w,h,0,0,WIDTH,HEIGHT);}
  else if(ART.ready)g.drawImage(ART.terrain,0,0,WIDTH,HEIGHT);else{g.fillStyle=['#a57849','#bedce8','#347f8f','#607a3b'][biome];g.fillRect(0,0,WIDTH,HEIGHT);}
+ paintMapWater(g,routes,biome);
  for(const route of routes){const trace=()=>{g.beginPath();g.moveTo(route.points[0].x,route.points[0].y);for(const p of route.points.slice(1))g.lineTo(p.x,p.y);};g.lineJoin='round';g.lineCap='round';for(const[w,color]of[[48,'#12212c88'],[43,biome===1?'#879da7':'#6b736c'],[36,'#29363c'],[30,'#414d50']]){g.lineWidth=w;g.strokeStyle=color;trace();g.stroke();}g.lineWidth=1;g.setLineDash([9,13]);g.strokeStyle='#ddc99577';trace();g.stroke();g.setLineDash([]);drawEntryPort(g,route);}
+ paintMapBridges(g,routes);
 }
 function makeLandscape(){if(state.mode!=='campaign'){legacyLandscape();return;}paintSector(landscape.getContext('2d'),ROUTES,sectorPads(state.sectorId),sectorInfo(state.sectorId).biome);}
 function drawSectorPreview(id,target='sectorPreviewCanvas',rotated=false){
@@ -1886,51 +1866,7 @@ function drawSectorPreview(id,target='sectorPreviewCanvas',rotated=false){
 // All road bends lie on a grid with a two-cell step. Distinct lanes have land
 // between them; routes only touch where they become one shared road.
 const SECTOR_LAYOUTS=new Map();
-function baseSectorBlueprint(id){
- const count=sectorInfo(id).routes,v=id%3,a=6+2*v,b=14+2*v,kind=id%4,ridge=16+2*(Math.floor(id/6)%2);
- const raw=[],anchors=[];let name='',note='Позиции на изгибах и вдоль дорог. Крио поддерживает соседние орудия.';
- const add=cells=>raw.push({cells});
- const anchor=(c,r,role='crossfire')=>anchors.push({c,r,role,route:0});
- const doublePass=[5,12,19,26].includes(id);
- const fork=[4,9,16,22].includes(id);
- if(fork){
-  raw.push({fork:true,entryId:0,cells:[[-1,5],[4,5],[4,1],[14,1],[14,5],[23,5]]});
-  raw.push({fork:true,entryId:0,cells:[[-1,5],[4,5],[4,9],[14,9],[14,5],[23,5]]});
-  if(count===3)raw.push({fork:true,entryId:1,cells:[[-1,11],[20,11],[20,5],[23,5]]});
-  anchor(12,3);anchor(12,7);if(count===3)anchor(18,8);
-  name='Разветвлённый рубеж';note='Отряды расходятся по двум обходам и снова сходятся перед ядром.';
- }else if(doublePass){
-  name='Дальний разворот';note='Одна особая позиция обстреливает прямой и обратный проходы. Дальний поворот вне радиуса Импульса.';
-  const main=[[-1,1],[14,1],[14,5],[6,5],[6,7],[22,7],[22,5],[23,5]];
-  add(main);anchor(10,3,'double_pass');anchor(8,3,'support');
-  if(count===4)add([[-1,3],[2,3],[2,1],...main.slice(1)]);
-  if(count>=2)add([[-1,9],[22,9],[22,5],[23,5]]);
-  if(count>=3)add([[-1,11],[22,11],[22,5],[23,5]]);
- }else if(count===1){
-  if(kind===0){name='Широкая дуга';add([[-1,3],[a,3],[a,7],[b,7],[b,5],[23,5]]);anchor(a+1,5);}
-  if(kind===1){name='Ступенчатый рубеж';add([[-1,1],[a,1],[a,5],[b,5],[b,9],[20,9],[20,5],[23,5]]);anchor(a+1,3);}
-  if(kind===2){name='Компактный бастион';const x=10+2*(Math.floor(id/4)%2);add([[-1,3],[x,3],[x,7],[x-4,7],[x-4,9],[20,9],[20,5],[23,5]]);anchor(x-2,5);}
-  if(kind===3){name='Высокая гряда';add([[-1,9],[4,9],[4,5],[10,5],[10,1],[18,1],[18,5],[23,5]]);anchor(12,3);}
- }else if(count===2){
-  if(kind===0){name='Два фланга';add([[-1,1],[a,1],[a,3],[16,3],[16,5],[22,5],[23,5]]);add([[-1,11],[4+2*v,11],[4+2*v,9],[18,9],[18,7],[22,7],[22,5],[23,5]]);anchor(a+2,2);anchor(16,8);}
-  if(kind===1){name='Верхний обход';add([[-1,3],[a,3],[a,1],[16,1],[16,3],[20,3],[20,5],[23,5]]);add([[-1,9],[10+2*v,9],[10+2*v,7],[20,7],[20,5],[23,5]]);anchor(a+2,2);anchor(17,8);}
-  if(kind===2){name='Встречные рубежи';add([[-1,1],[4+2*v,1],[4+2*v,5],[18,5],[23,5]]);add([[-1,11],[b,11],[b,7],[22,7],[22,5],[23,5]]);anchor(6+2*v,3);anchor(b+1,9);}
-  if(kind===3){name='Дуга и долина';add([[-1,5],[a,5],[a,1],[18,1],[18,5],[23,5]]);add([[-1,11],[4,11],[4,9],[14,9],[14,7],[22,7],[22,5],[23,5]]);anchor(a+2,3);anchor(12,8);}
- }else{
-  name=count===3?'Три рубежа':'Четыре направления';
-  add([[-1,1],[a,1],[a,3],[ridge,3],[ridge,1],[22,1],[22,5],[23,5]]);
-  if(count===3){
-   add(kind%2?[[-1,7],[10+2*v,7],[10+2*v,5],[22,5],[23,5]]:[[-1,5],[22,5],[23,5]]);
-   add([[-1,11],[8+2*v,11],[8+2*v,9],[18,9],[18,7],[22,7],[22,5],[23,5]]);
-  }else{
-   add([[-1,5],[23,5]]);
-   add(kind%2?[[-1,7],[18,7],[18,5],[23,5]]:[[-1,7],[22,7],[22,5],[23,5]]);
-   add([[-1,11],[a,11],[a,9],[18,9],[18,11],[22,11],[22,5],[23,5]]);
-  }
-  anchor(a+2,2);anchor(16,10);
- }
- return{raw,anchors,name,note,doublePass,fork};
-}
+
 function validateRoadClearance(raw){
  const graph=new Map(),directed=new Map(),key=(c,r)=>c+','+r;
  const ensure=k=>{if(!graph.has(k))graph.set(k,new Set());return graph.get(k);};
@@ -2074,7 +2010,7 @@ function migrateV19Run(saved){
  if(saved.mode==='campaign'&&[17,18].includes(old))saved.rulesVersion=19;
  if(saved.mode==='endless'&&[17,18].includes(old))saved.mapVersion=19;
  for(const t of Array.isArray(saved.towers)?saved.towers:[])if(t.type==='cannon'&&t.branch==='siege')t.branch='scorch';
- normaliseSpawnQueue(saved);if(saved.rulesVersion!==30)migrateFinalBoss(saved);
+ normaliseSpawnQueue(saved);if(saved.rulesVersion!==31)migrateFinalBoss(saved);
  if(saved.mode==='campaign'&&[17,18].includes(old)){saved.launchCooldown=0;saved.nextWaveIn=Math.min(saved.nextWaveIn,5-4*clamp(saved.wave/Math.max(1,saved.goalWaves-1),0,1));}
  if(saved.wave===0)saved.nextWaveIn=0;
  saved.orbitalCraters??=[];
@@ -2111,14 +2047,7 @@ function activeThreatRatio(){
  const alive=state.enemies.reduce((v,e)=>v+(e.hp>0?enemyThreat(e,e.hp):0),0),queued=state.queue.reduce((v,e)=>v+enemyThreat(e),0);
  return total?clamp((alive+queued)/total,0,1):0;
 }
-function earlyRewardCap(n){
- const key=[state.mode,state.sectorId,state.difficulty,state.encounterVersion,state.goalWaves,n].join('/');if(EARLY_REWARD_CACHE.has(key))return EARLY_REWARD_CACHE.get(key);
- if(extendedStandard()){const cap=standardEconomy().earlyCaps[n]||0;EARLY_REWARD_CACHE.set(key,cap);return cap;}
- let budget=0;
- const first=state.mode==='campaign'?1:n;
- for(let wave=first;wave<=n;wave++){const value=wavePlan(wave).reduce((v,e)=>v+(state.mode==='campaign'?campaignBounty(e.type,e.elite):ENEMIES[e.type].reward),0);budget=Math.max(budget,value);}
- const cap=20+n*2+Math.round(budget*.18);EARLY_REWARD_CACHE.set(key,cap);return cap;
-}
+
 function earlyRewardCapForMission(id,difficulty,n){
  const previous=state;state={...state,mode:'campaign',sectorId:id,difficulty,encounterVersion:31,goalWaves:difficulty?1:sectorInfo(id).waves};try{return earlyRewardCap(n);}finally{state=previous;}
 }
@@ -2136,6 +2065,6 @@ function confirmBattleAction(){closeAllDialogs();if(pendingBattleAction==='resta
 
 /* __BATTLE_SYSTEM__ */
 
-makeLandscape();fitCanvas();const restored=restoreProgress();const assetsReady=loadArt();refreshUI();requestAnimationFrame(frame);
+initFrontierRevision();makeLandscape();fitCanvas();const restored=restoreProgress();const assetsReady=loadArt();refreshUI();requestAnimationFrame(frame);
 initShell(restored);initProgression();initCampaignUI();initTestLab();initCombatInput();
 

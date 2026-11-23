@@ -13,6 +13,10 @@ sys.path.insert(0,str(ROOT/'scripts'))
 from build import version_name
 
 class OfflineBundle(unittest.TestCase):
+    def test_garrison_behavior(self):
+        result=subprocess.run(['node',str(ROOT/'tests/frontier.test.cjs')],capture_output=True,text=True,encoding='utf-8',timeout=30)
+        self.assertEqual(result.returncode,0,result.stdout+result.stderr)
+
     def test_battle_ui_behavior(self):
         script=ROOT/'tests/battle-ui.test.cjs'
         result=subprocess.run(['node',str(script)],capture_output=True,text=True,encoding='utf-8',timeout=30)
